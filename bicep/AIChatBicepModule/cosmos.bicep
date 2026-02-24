@@ -139,7 +139,7 @@ resource cosmosPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
   properties: {
     privateLinkServiceConnections: [
       {
-        name: 'psc-${cosmosDbAccountName}'
+        name: 'psc-${cosmosDbDatabaseName}'
         properties: {
           privateLinkServiceId: cosmosAccount.id
           groupIds: ['Sql']

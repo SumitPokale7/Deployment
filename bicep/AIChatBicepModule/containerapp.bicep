@@ -189,24 +189,24 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = [for (app, i) i
       containers: [
         {
           // Image managed by CI/CD - use placeholder for initial deployment
-          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          image: app.value.?image ?? 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
           name: app.value.name
           resources: {
             cpu: contains(app.value, 'cpu') ? json(app.value.cpu) : json('0.25')
             memory: app.value.?memory ?? '0.5Gi'
           }
-          probes: contains(app.value, 'liveness_probe_path') ? [
-            {
-              type: 'Liveness'
-              httpGet: {
-                path: app.value.liveness_probe_path
-                port: app.value.?liveness_probe_port ?? app.value.target_port
-              }
-              initialDelaySeconds: 10
-              periodSeconds: 30
-              failureThreshold: 3
-            }
-          ] : []
+          // probes: contains(app.value, 'liveness_probe_path') ? [
+          //   {
+          //     type: 'Liveness'
+          //     httpGet: {
+          //       path: app.value.liveness_probe_path
+          //       port: app.value.?liveness_probe_port ?? app.value.target_port
+          //     }
+          //     initialDelaySeconds: 10
+          //     periodSeconds: 30
+          //     failureThreshold: 3
+          //   }
+          // ] : []
           env: app.value.?env ?? []
         }
       ]

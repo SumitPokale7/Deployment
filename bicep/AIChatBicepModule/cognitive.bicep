@@ -248,7 +248,6 @@ resource openaiPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
       id: privateEndpointSubnetId
     }
     ipConfigurations: []
-    customDnsConfigs: []
   }
 }]
 
