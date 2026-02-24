@@ -113,7 +113,38 @@ resource privateEndpointNsg 'Microsoft.Network/networkSecurityGroups@2024-07-01'
   location: location
   tags: tags
   properties: {
-    securityRules: []
+    securityRules: [
+      {
+        name: 'AllowAGWAFBackEnd'
+        properties: {
+          access: 'Allow'
+          direction: 'Inbound'
+          priority: 110
+          protocol: 'Tcp'
+          sourceAddressPrefix: '*'
+          sourcePortRange: '*'
+          destinationAddressPrefixes: [
+            '20.118.40.5'
+          ]
+          destinationPortRange: '443'
+        }
+      }
+      {
+        name: 'AllowAGWAFFrontEnd'
+        properties: {
+          access: 'Allow'
+          direction: 'Inbound'
+          priority: 100
+          protocol: 'Tcp'
+          sourceAddressPrefix: '*'
+          sourcePortRange: '*'
+          destinationAddressPrefixes: [
+            '20.118.40.5'
+          ]
+          destinationPortRange: '443'
+        }
+      }
+    ]
   }
 }
 
@@ -146,7 +177,6 @@ resource agwafSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-07-01' = {
     }
     privateEndpointNetworkPolicies: 'Disabled'
     privateLinkServiceNetworkPolicies: 'Enabled'
-    defaultOutboundAccess: true
   }
 }
 

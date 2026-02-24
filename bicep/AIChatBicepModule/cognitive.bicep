@@ -80,15 +80,8 @@ resource formRecognizer 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: formRecognizerSubdomainName
-    // networkAcls: {
-    //   defaultAction: 'Allow'
-    //   virtualNetworkRules: []
-    //   ipRules: []
-    // }
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: enablePrivateEndpoint ? 'Disabled' : 'Enabled'
     disableLocalAuth: false
-    dynamicThrottlingEnabled: false
-    restrictOutboundNetworkAccess: false
   }
 }
 
@@ -114,7 +107,7 @@ resource translator 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       virtualNetworkRules: []
       ipRules: []
     }
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: enablePrivateEndpoint ? 'Disabled' : 'Enabled'
     disableLocalAuth: false
   }
 }
@@ -224,7 +217,6 @@ resource openaiDeployments 'Microsoft.CognitiveServices/accounts/deployments@202
     model: {
       format: 'OpenAI'
       name: model.value.model_name
-      version: model.value.?model_version ?? null
     }
     raiPolicyName: 'Microsoft.DefaultV2'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'

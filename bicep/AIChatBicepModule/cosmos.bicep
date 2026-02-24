@@ -17,6 +17,7 @@ param cosmosDbAccountName string
 param cosmosDbDatabaseName string
 
 @description('Failover location for Cosmos DB')
+#disable-next-line no-unused-params
 param secondaryDbLocation string = 'westus'
 
 @description('Enable private endpoint for Cosmos DB')
@@ -52,36 +53,22 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-08-15' = {
   properties: {
     publicNetworkAccess: enablePrivateEndpoint ? 'Disabled' : 'Enabled'
     enableAutomaticFailover: false
-    enableMultipleWriteLocations: false
-    isVirtualNetworkFilterEnabled: false
+    enableMultipleWriteLocations: true
+    isVirtualNetworkFilterEnabled: true
     virtualNetworkRules: []
-    disableKeyBasedMetadataWriteAccess: false
+    disableKeyBasedMetadataWriteAccess: true
     enableFreeTier: false
     enableAnalyticalStorage: false
-    analyticalStorageConfiguration: {
-      schemaType: 'WellDefined'
-    }
     databaseAccountOfferType: 'Standard'
-    defaultIdentity: 'FirstPartyIdentity'
-    networkAclBypass: 'None'
     disableLocalAuth: false
-    enablePartitionMerge: false
-    enableBurstCapacity: false
     minimalTlsVersion: 'Tls12'
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
-      maxIntervalInSeconds: 5
-      maxStalenessPrefix: 100
     }
     locations: [
       {
         locationName: location
         failoverPriority: 0
-        isZoneRedundant: false
-      }
-      {
-        locationName: secondaryDbLocation
-        failoverPriority: 1
         isZoneRedundant: false
       }
     ]
@@ -97,9 +84,6 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-08-15' = {
       }
     }
     networkAclBypassResourceIds: []
-    capacity: {
-      totalThroughputLimit: 4000
-    }
   }
 }
 
@@ -141,7 +125,6 @@ resource cosmosDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLink
     virtualNetwork: {
       id: virtualNetworkId
     }
-    resolutionPolicy: 'Default'
   }
 }
 
@@ -156,7 +139,7 @@ resource cosmosPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
   properties: {
     privateLinkServiceConnections: [
       {
-        name: cosmosDbPrivateEndpointName
+        name: 'psc-${cosmosDbAccountName}'
         properties: {
           privateLinkServiceId: cosmosAccount.id
           groupIds: ['Sql']
@@ -169,7 +152,6 @@ resource cosmosPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
       id: privateEndpointSubnetId
     }
     ipConfigurations: []
-    customDnsConfigs: []
   }
 }
 
