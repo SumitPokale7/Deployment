@@ -56,6 +56,7 @@ param vpnIpAddresses array = [
   '208.91.239.1/32'
   '20.94.99.16/28'
   '20.80.45.128/28'
+  '172.177.156.178/32'
 ]
 
 @description('Veracode IP address')
@@ -142,6 +143,138 @@ var cspHeaderValue = environment == 'dev'
 
 // VPN IPs including APIM for block rule
 var vpnIpsWithApim = !empty(apimIp) ? concat(vpnIpAddresses, [veracodeIp, apimIp]) : concat(vpnIpAddresses, [veracodeIp])
+
+// AI-related request parameter names that need WAF SQLI/XSS exclusions
+var aiParamNames = [
+  'message'
+  'query'
+  'prompt'
+  'content'
+  'input'
+  'text'
+  'data'
+  'payload'
+  'body'
+  'request'
+  'chat'
+  'conversation'
+  'response'
+  'answer'
+  'question'
+  'instruction'
+  'system'
+  'user'
+  'assistant'
+  'context'
+  'history'
+  'thread'
+  'session'
+  'completion'
+  'generate'
+]
+
+// SQLI and XSS exclusion rule sets applied to AI params
+var sqliAndXssExclusionRuleSets = [
+  {
+    ruleSetType: wafRuleSetType
+    ruleSetVersion: wafRuleSetVersion
+    ruleGroups: [
+      {
+        ruleGroupName: 'REQUEST-942-APPLICATION-ATTACK-SQLI'
+        rules: [
+          { ruleId: '942100' }
+          { ruleId: '942110' }
+          { ruleId: '942120' }
+          { ruleId: '942130' }
+          { ruleId: '942140' }
+          { ruleId: '942150' }
+          { ruleId: '942160' }
+          { ruleId: '942170' }
+          { ruleId: '942180' }
+          { ruleId: '942190' }
+          { ruleId: '942200' }
+          { ruleId: '942210' }
+          { ruleId: '942220' }
+          { ruleId: '942230' }
+          { ruleId: '942240' }
+          { ruleId: '942250' }
+          { ruleId: '942260' }
+          { ruleId: '942270' }
+          { ruleId: '942280' }
+          { ruleId: '942290' }
+          { ruleId: '942300' }
+          { ruleId: '942310' }
+          { ruleId: '942320' }
+          { ruleId: '942330' }
+          { ruleId: '942340' }
+          { ruleId: '942350' }
+          { ruleId: '942360' }
+          { ruleId: '942370' }
+          { ruleId: '942380' }
+          { ruleId: '942390' }
+          { ruleId: '942400' }
+          { ruleId: '942410' }
+          { ruleId: '942420' }
+          { ruleId: '942430' }
+          { ruleId: '942440' }
+          { ruleId: '942450' }
+          { ruleId: '942460' }
+          { ruleId: '942470' }
+          { ruleId: '942480' }
+          { ruleId: '942490' }
+          { ruleId: '942500' }
+        ]
+      }
+      {
+        ruleGroupName: 'REQUEST-941-APPLICATION-ATTACK-XSS'
+        rules: [
+          { ruleId: '941100' }
+          { ruleId: '941110' }
+          { ruleId: '941120' }
+          { ruleId: '941130' }
+          { ruleId: '941140' }
+          { ruleId: '941150' }
+          { ruleId: '941160' }
+          { ruleId: '941170' }
+          { ruleId: '941180' }
+          { ruleId: '941190' }
+          { ruleId: '941200' }
+          { ruleId: '941210' }
+          { ruleId: '941220' }
+          { ruleId: '941230' }
+          { ruleId: '941240' }
+          { ruleId: '941250' }
+          { ruleId: '941260' }
+          { ruleId: '941270' }
+          { ruleId: '941280' }
+          { ruleId: '941290' }
+          { ruleId: '941300' }
+          { ruleId: '941310' }
+          { ruleId: '941320' }
+          { ruleId: '941330' }
+          { ruleId: '941340' }
+          { ruleId: '941350' }
+          { ruleId: '941360' }
+        ]
+      }
+    ]
+  }
+]
+
+// WAF exclusions for AI param names (both RequestArgNames and RequestArgValues)
+var aiParamNamesExclusions = [for name in aiParamNames: {
+  matchVariable: 'RequestArgNames'
+  selectorMatchOperator: 'Contains'
+  selector: name
+  exclusionManagedRuleSets: sqliAndXssExclusionRuleSets
+}]
+
+var aiParamValuesExclusions = [for name in aiParamNames: {
+  matchVariable: 'RequestArgValues'
+  selectorMatchOperator: 'Contains'
+  selector: name
+  exclusionManagedRuleSets: sqliAndXssExclusionRuleSets
+}]
 
 // Pre-compute arrays for use in Application Gateway properties
 // (Bicep doesn't support for-expressions inside concat())
@@ -460,26 +593,6 @@ resource wafPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPo
           ]
         }
         {
-          name: 'Veracode'
-          priority: 3
-          ruleType: 'MatchRule'
-          action: 'Allow'
-          state: 'Enabled'
-          matchConditions: [
-            {
-              matchVariables: [
-                {
-                  variableName: 'RemoteAddr'
-                }
-              ]
-              operator: 'IPMatch'
-              negationConditon: false
-              matchValues: [veracodeIp]
-              transforms: []
-            }
-          ]
-        }
-        {
           name: 'BlockNonVPNIPs'
           priority: 5
           ruleType: 'MatchRule'
@@ -495,6 +608,26 @@ resource wafPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPo
               operator: 'IPMatch'
               negationConditon: true // Block IPs NOT in VPN/Veracode ranges
               matchValues: vpnIpsWithApim
+              transforms: []
+            }
+          ]
+        }
+        {
+          name: 'Veracode'
+          priority: 3
+          ruleType: 'MatchRule'
+          action: 'Allow'
+          state: 'Enabled'
+          matchConditions: [
+            {
+              matchVariables: [
+                {
+                  variableName: 'RemoteAddr'
+                }
+              ]
+              operator: 'IPMatch'
+              negationConditon: false
+              matchValues: [veracodeIp]
               transforms: []
             }
           ]
@@ -607,7 +740,9 @@ resource wafPolicy 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPo
               }
             ]
           }
-        ]
+        ],
+        aiParamNamesExclusions,
+        aiParamValuesExclusions
       )
     }
   }

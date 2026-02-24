@@ -62,6 +62,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-08-15' = {
     databaseAccountOfferType: 'Standard'
     disableLocalAuth: false
     minimalTlsVersion: 'Tls12'
+    analyticalStorageConfiguration: {schemaType: 'WellDefined'}
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
     }

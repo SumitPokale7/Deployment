@@ -79,14 +79,8 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = if (d
   sku: {
     name: acrSku
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
   properties: {
-    adminUserEnabled: true
-    networkRuleSet: {
-      defaultAction: 'Allow'
-    }
+    adminUserEnabled: false
     policies: {
       quarantinePolicy: {
         status: 'disabled'
@@ -143,6 +137,16 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
         workloadProfileType: workloadProfileType
       }
     ]
+    peerAuthentication: {
+      mtls: {
+        enabled: false
+      }
+    }
+    peerTrafficConfiguration: {
+      encryption: {
+        enabled: false
+      }
+    }
   }
 }
 
@@ -177,7 +181,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = [for (app, i) i
         ]
         allowInsecure: false
       }
-      registries: deployAcr ? [
+      registries: (deployAcr && (app.value.?use_acr ?? true)) ? [
         {
           server: '${acrName}.azurecr.io'
           identity: 'system-environment'
@@ -195,18 +199,41 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = [for (app, i) i
             cpu: contains(app.value, 'cpu') ? json(app.value.cpu) : json('0.25')
             memory: app.value.?memory ?? '0.5Gi'
           }
-          // probes: contains(app.value, 'liveness_probe_path') ? [
-          //   {
-          //     type: 'Liveness'
-          //     httpGet: {
-          //       path: app.value.liveness_probe_path
-          //       port: app.value.?liveness_probe_port ?? app.value.target_port
-          //     }
-          //     initialDelaySeconds: 10
-          //     periodSeconds: 30
-          //     failureThreshold: 3
-          //   }
-          // ] : []
+          probes: contains(app.value, 'liveness_probe_path') ? [
+            {
+              type: 'Liveness'
+              httpGet: {
+                path: app.value.liveness_probe_path
+                port: app.value.?liveness_probe_port ?? app.value.?target_port ?? 8001
+                scheme: 'HTTP'
+              }
+              initialDelaySeconds: 1
+              periodSeconds: 10
+              failureThreshold: 2
+              timeoutSeconds: 1
+            }
+            {
+              type: 'Readiness'
+              tcpSocket: {
+                port: app.value.?target_port ?? 8001
+              }
+              failureThreshold: 48
+              periodSeconds: 5
+              successThreshold: 1
+              timeoutSeconds: 5
+            }
+            {
+              type: 'Startup'
+              tcpSocket: {
+                port: app.value.?target_port ?? 8001
+              }
+              initialDelaySeconds: 1
+              periodSeconds: 1
+              failureThreshold: 240
+              successThreshold: 1
+              timeoutSeconds: 3
+            }
+          ] : []
           env: app.value.?env ?? []
         }
       ]

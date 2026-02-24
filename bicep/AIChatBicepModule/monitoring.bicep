@@ -268,7 +268,7 @@ resource slowServerResponseTime 'microsoft.insights/components/ProactiveDetectio
 // Email Action Group for Failure Anomalies
 // ===========================================================================
 resource actionGroups_email 'microsoft.insights/actionGroups@2024-10-01-preview' = {
-  name: 'email'
+  name: 'email_achyuth'
   location: 'Global'
   tags: tags
   properties: {

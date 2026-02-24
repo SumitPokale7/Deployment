@@ -218,7 +218,6 @@ resource openaiDeployments 'Microsoft.CognitiveServices/accounts/deployments@202
       format: 'OpenAI'
       name: model.value.model_name
     }
-    raiPolicyName: 'Microsoft.DefaultV2'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
     currentCapacity: model.value.capacity
   }

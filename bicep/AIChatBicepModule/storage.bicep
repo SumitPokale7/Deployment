@@ -90,7 +90,18 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2025-01-01'
         }
       ] : []
     }
+    changeFeed: {
+      enabled: false
+    }
+    containerDeleteRetentionPolicy: {
+      enabled: false
+    }
     deleteRetentionPolicy: {
+      enabled: false
+      allowPermanentDelete: false
+    }
+    isVersioningEnabled: false
+    restorePolicy: {
       enabled: false
     }
   }
