@@ -1,0 +1,52 @@
+# RBAC Parameters Template
+# This template defines all RBAC-related parameters that can be used across pipelines
+
+parameters:
+- name: runChatAppRBAC
+  displayName: 'Run Chat App RBAC'
+  type: boolean
+  default: false
+- name: runTranslatorRBAC
+  displayName: 'Run Translator RBAC'
+  type: boolean
+  default: false
+- name: runMailboxRBAC
+  displayName: 'Run Commercial Mailbox RBAC'
+  type: boolean
+  default: false
+- name: runBackendRBAC
+  displayName: 'Run Backend API RBAC'
+  type: boolean
+  default: false
+- name: runFrontendRBAC
+  displayName: 'Run Frontend RBAC'
+  type: boolean
+  default: false
+- name: runSharepointRBAC
+  displayName: 'Run Sharepoint RBAC'
+  type: boolean
+  default: false
+- name: runKMSTrainingRBAC
+  displayName: 'Run KMS Training API RBAC'
+  type: boolean
+  default: false
+- name: runContainerAppsRBAC
+  displayName: 'Run Container Apps RBAC'
+  type: boolean
+  default: false
+- name: environment
+  displayName: 'Environment'
+  type: string
+  default: 'dev'
+  values:
+  - demo
+  - dev
+  - prod
+- name: serviceConnection
+  displayName: 'Azure Service Connection'
+  type: string
+  default: ''
+- name: resourceGroupName
+  displayName: 'Resource Group Name'
+  type: string
+  default: ''

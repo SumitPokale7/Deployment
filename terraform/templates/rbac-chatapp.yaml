@@ -1,0 +1,195 @@
+# Chat App RBAC Job Template
+# This template handles RBAC configuration for the Chat Application
+
+parameters:
+- name: environment
+  type: string
+- name: serviceConnection
+  type: string
+- name: resourceGroupName
+  type: string
+- name: enabled
+  type: boolean
+  default: true
+
+jobs:
+- job: chatApp_RoleBasedAccessControl
+  displayName: 'Chat App RBAC Configuration'
+  pool:
+    name: "Release-ITPortfolio-NP"
+  condition: eq('${{ parameters.enabled }}', true)
+  steps:
+    - checkout: self
+      clean: true
+      
+    # Gathering resource ID's dynamically so we do not have to hard code resource names and identities - for use in RBAC
+    - task: AzurePowerShell@5
+      displayName: "Get Resource Id's for RBAC"
+      inputs:
+        azureSubscription: '${{ parameters.serviceConnection }}'
+        ScriptType: 'InlineScript'
+        Inline: |
+          $localrgname = "${{ parameters.resourceGroupName }}"
+          
+          # Determine environment prefix
+          $environment = "${{ parameters.environment }}"
+          $envPrefix = switch ($environment.ToLower()) {
+            "prod" { "p01" }
+            "demo" { "m01" }
+            "dev"  { "d01" }
+            default { "d01" }
+          }
+          
+          $samilocal = (Get-AzSystemAssignedIdentity -Scope "/subscriptions/$((Get-AzContext).Subscription.Id)/resourceGroups/$localrgname/providers/Microsoft.Web/sites/as-$envPrefix-ai-cognitive-truchat-backend-tf").PrincipalId
+          Write-Host "##vso[task.setvariable variable=sami]$samilocal"
+          $kvidlocal = (Get-AzKeyVault -VaultName  "kv-$envPrefix-ai-cognitive-tf").ResourceId
+          Write-Host "##vso[task.setvariable variable=kvid]$kvidlocal"
+          $saidlocal = (Get-AZStorageAccount -ResourceGroupName $localrgname).ResourceId
+          Write-Host "##vso[task.setvariable variable=said]$saidlocal"
+          $ssvcidlocal = (Get-AzResource -ResourceGroupName $localrgname | where-object resourcetype -eq "Microsoft.Search/searchServices").ResourceID
+          Write-Host "##vso[task.setvariable variable=ssvcid]$ssvcidlocal"
+          $fridlocal = (Get-AzCognitiveServicesAccount -ResourceGroupName $localrgname | Where-Object AccountType -eq "FormRecognizer").id
+          Write-Host "##vso[task.setvariable variable=frid]$fridlocal"
+          $oaiidlocal = (Get-AzCognitiveServicesAccount -ResourceGroupName $localrgname | Where-Object AccountType -eq "OpenAI").id
+          $oaiidlocal1 = $oaiidlocal[0]
+          $oaiidlocal2 = $oaiidlocal[1]
+          $oaiidlocal3 = $oaiidlocal[2]
+          Write-Host "##vso[task.setvariable variable=oaiid1]$oaiidlocal1"
+          Write-Host "##vso[task.setvariable variable=oaiid2]$oaiidlocal2"
+          Write-Host "##vso[task.setvariable variable=oaiid3]$oaiidlocal3"
+          $cdbidlocal = (Get-AzResource -ResourceGroupName $localrgname | where-object resourcetype -eq "Microsoft.DocumentDB/databaseAccounts").ResourceID
+          Write-Host "##vso[task.setvariable variable=cdbid]$cdbidlocal"
+        azurePowerShellVersion: 'LatestVersion'
+      enabled: true
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Key Vault Secrets User for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(kvid)
+        identity: $(sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Key Vault Secrets User'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Search Index Data Contributor for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(ssvcid)
+        identity: $(sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Search Index Data Contributor'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Search Service Contributor for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(ssvcid)
+        identity: $(sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Search Service Contributor'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Cognitive Services User for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(frid)
+        identity: $(sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Cognitive Services User'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Cognitive Services OpenAI User for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(oaiid1)
+        identity: $(sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Cognitive Services OpenAI User'
+      enabled: true
+      condition: succeededOrFailed()
+      
+    - task: deployAzureRbacChanges@1
+      displayName: "Cognitive Services OpenAI User for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(oaiid2)
+        identity: $(sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Cognitive Services OpenAI User'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Cognitive Services OpenAI User for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(oaiid3)
+        identity: $(sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Cognitive Services OpenAI User'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Cosmos DB Operator for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(cdbid)
+        identity: $(sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Cosmos DB Operator'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Storage Blob Data Contributor for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(said)
+        identity: '$(sami)'
+        permissionsAction: 'permissionAdd'
+        permissions: 'Storage Blob Data Contributor'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Key vault secrets officer for SP-RM Account"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(kvid)
+        identity: '394cd05b-9c01-4a9b-abfe-e9ba1d1533bf'
+        permissionsAction: 'permissionAdd'
+        permissions: 'Key Vault Secrets Officer'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Key vault reader for R-App-AI-Truchat-Developers"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(kvid)
+        identity: 'R-App-AI-Truchat-Developers'
+        permissionsAction: 'permissionAdd'
+        permissions: 'Key Vault Reader'
+      enabled: true
+      condition: succeededOrFailed()
+
+    - task: deployAzureRbacChanges@1
+      displayName: "cmfg Azure Portal Dashboard Publisher for R-App-AI-Truchat-Developers"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: '/subscriptions/059ed1ab-6824-4344-9a65-a0504248340f/resourceGroups/RG-CMFG-D01-PSA-CognitiveServices-TF'
+        identity: 'R-App-AI-Truchat-Developers'
+        permissionsAction: 'permissionAdd'
+        permissions: 'cmfg Azure Portal Dashboard Publisher'
+      enabled: true
+      condition: succeededOrFailed()

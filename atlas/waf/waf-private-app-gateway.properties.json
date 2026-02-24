@@ -1,0 +1,264 @@
+{
+	"sku": {
+		"name": "Waf_v2",
+		"tier": "Waf_v2"
+	},
+	"gatewayIPConfigurations": [
+		{
+			"name": "appGatewayIpConfig",
+			"properties": {
+				"subnet": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(VNET_RG_NAME)/providers/Microsoft.Network/virtualNetworks/$(VNET_NAME)/subnets/$(SUBNET_NAME_PRIVATE)"
+				}
+			}
+		}
+	],
+	"sslCertificates": [
+		{
+			"name": "truchat-cert",
+			"properties": {
+				"data": "$(SSL_CERTIFICATE_DATA_TRUCHAT)",
+				"password": "$(SSL_CERTIFICATE_PASSWORD_TRUCHAT)"
+			}
+		}	
+	],
+	"frontendIPConfigurations": [
+		{
+			"name": "appGatewayFrontendIP",
+			"properties": {
+				"PublicIPAddress": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/publicIPAddresses/$(AG_WAF_NAME_PRIVATE)-IP"
+				}
+			}
+		}
+	],
+	"frontendPorts": [
+		{
+			"name": "appGatewayFrontendPort80",
+			"properties": {
+				"Port": 80
+			}
+		},
+		{
+			"name": "appGatewayFrontendPort443",
+			"properties": {
+				"Port": 443
+			}
+		}
+	],
+	"backendAddressPools": [
+		{
+			"name": "as-truchat-backend-pool",
+			"properties": {
+				"BackendAddresses": [
+					{
+						"fqdn": "$(APP_NAME_TRUCHAT).azurewebsites.net"
+					}
+				]
+			}
+		}
+	],
+	"probes": [
+		{
+			"name": "as-truchat-https-probe",
+			"properties": {
+				"protocol": "Https",
+				"path": "/",
+				"interval": 120,
+				"timeout": 30,
+				"unhealthyThreshold": 3,
+				"pickHostNameFromBackendHttpSettings": true,
+				"minServers": 0,
+				"match": {
+					"statusCodes": [
+						"200"
+					]
+				}
+			}
+		}
+		
+	],
+	"httpListeners": [
+		{
+			"name": "truchat-http-listener",
+			"properties": {
+				"FrontendIPConfiguration": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/frontendIPConfigurations/appGatewayFrontendIP"
+				},
+				"FrontendPort": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/frontendPorts/appGatewayFrontendPort80"
+				},
+				"Protocol": "Http",
+				"hostName": "$(HOST_NAME_TRUCHAT)",
+				"requireServerNameIndication": false
+			}
+		},
+		{
+			"name": "truchat-https-listener",
+			"properties": {
+				"FrontendIPConfiguration": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/frontendIPConfigurations/appGatewayFrontendIP"
+				},
+				"FrontendPort": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/frontendPorts/appGatewayFrontendPort443"
+				},
+				"Protocol": "Https",
+				"hostName": "$(HOST_NAME_TRUCHAT)",
+				"requireServerNameIndication": true,
+				"sslCertificate": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/sslCertificates/truchat-cert"
+				}
+			}
+		}
+	],
+	"backendHttpSettingsCollection": [
+		{
+			"name": "as-truchat-https-settings",
+			"properties": {
+				"Port": 443,
+				"Protocol": "Https",
+				"CookieBasedAffinity": "Disabled",
+				"pickHostNameFromBackendAddress": true,
+				"path": "/",
+				"requestTimeout": 20,
+				"probe": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/probes/as-truchat-https-probe"
+				}
+			}
+		}
+	],
+	"requestRoutingRules": [
+		{
+			"name": "truchat-https-rule",
+			"properties": {
+				"RuleType": "PathBasedRouting",
+				"httpListener": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/httpListeners/truchat-https-listener"
+				},
+				"urlPathMap": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/urlPathMaps/truchat-https-rule"
+				}
+			}
+		},
+		{
+			"name": "truchat-httptohttps-rule",
+			"properties": {
+				"RuleType": "Basic",
+				"httpListener": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/httpListeners/truchat-http-listener"
+				},
+				"redirectConfiguration": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/redirectConfigurations/truchat-httptohttps-rule"
+				}
+			}
+		}
+	],
+	"urlPathMaps": [
+		{
+			"name": "truchat-https-rule",
+			"properties": {
+				"defaultBackendAddressPool": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/backendAddressPools/as-truchat-backend-pool"
+				},
+				"defaultBackendHttpSettings": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/backendHttpSettingsCollection/as-truchat-https-settings"
+				},
+				"defaultRewriteRuleSet": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/rewriteRuleSets/SecurityHeaders"
+				},
+				"pathRules": [
+					{
+						"name": "root",
+						"properties": {
+							"paths": [
+								"/*"
+							],
+							"backendAddressPool": {
+								"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/backendAddressPools/as-truchat-backend-pool"
+							},
+							"backendHttpSettings": {
+								"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/backendHttpSettingsCollection/as-truchat-https-settings"
+							},
+							"rewriteRuleSet": {
+								"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/rewriteRuleSets/SecurityHeaders"
+							}
+						}
+					}
+				]
+			}
+		}
+	],
+	"rewriteRuleSets": [
+		{
+			"name": "SecurityHeaders",
+			"properties": {
+				"rewriteRules": [
+					{
+						"name": "SecurityHeaders",
+						"actionSet": {
+							"responseHeaderConfigurations": [
+								{
+									"headerName": "Strict-Transport-Security",
+									"headerValue": "max-age=31536000"
+								}
+							]
+						}
+					}
+				]
+			}
+		},
+		{
+			"name": "X-Forwarded-Host",
+			"properties": {
+				"rewriteRules": [
+					{
+						"name": "X-Forwarded-Host",
+						"actionSet": {
+							"requestHeaderConfigurations": [
+								{
+									"headerName": "X-Forwarded-For",
+									"headerValue": "{var_add_x_forwarded_for_proxy}"
+								},
+								{
+									"headerName": "X-Forwarded-Host",
+									"headerValue": "{var_host}"
+								}
+							]
+						}
+					}
+				]
+			}
+		}
+	],
+	"redirectConfigurations": [
+		{
+			"name": "truchat-httptohttps-rule",
+			"properties": {
+				"redirectType": "Permanent",
+				"targetListener": {
+					"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/httpListeners/truchat-https-listener"
+				},
+				"includePath": true,
+				"includeQueryString": true,
+				"requestRoutingRules": [
+					{
+						"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(APP_RG_NAME)/providers/Microsoft.Network/applicationGateways/$(AG_WAF_NAME_PRIVATE)/requestRoutingRules/truchat-httptohttps-rule"
+					}
+				]
+			}
+		}
+	],
+	"sslPolicy": {
+		"policyType": "Predefined",
+		"policyName": "AppGwSslPolicy20170401S"
+	},
+	"enableHttp2": true,
+	"forceFirewallPolicyAssociation": true,
+	"firewallPolicy": {
+		"id": "/subscriptions/$(SUBSCRIPTION_ID)/resourceGroups/$(TF_RG_NAME)/providers/Microsoft.Network/applicationGatewayWebApplicationFirewallPolicies/WAFP-CMFG-EA2-$(AZENV)-DLX-PRIVATE"
+	},
+	"autoscaleConfiguration": {
+		"minCapacity": 0,
+		"maxCapacity": 20
+	}
+}

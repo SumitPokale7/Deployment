@@ -1,0 +1,278 @@
+trigger: none
+parameters:
+- name: runChatAppRBAC
+  displayName: 'Run Chat App RBAC'
+  type: boolean
+  default: false
+- name: runTranslatorRBAC
+  displayName: 'Run Translator RBAC'
+  type: boolean
+  default: false
+- name: runMailboxRBAC
+  displayName: 'Run Commercial Mailbox RBAC'
+  type: boolean
+  default: false
+- name: runBackendRBAC
+  displayName: 'Run Backend API RBAC'
+  type: boolean
+  default: false
+- name: runFrontendRBAC
+  displayName: 'Run Frontend RBAC'
+  type: boolean
+  default: false
+- name: runKMSTrainingRBAC
+  displayName: 'Run KMS Training API RBAC'
+  type: boolean
+  default: false
+- name: runContainerAppsRBAC
+  displayName: 'Run Container Apps RBAC'
+  type: boolean
+  default: false
+- name: runCoreApiRBAC
+  displayName: 'Run Core API RBAC'
+  type: boolean
+  default: false
+- name: runInferenceRBAC
+  displayName: 'Run Inference Service RBAC'
+  type: boolean
+  default: false
+- name: runDocIngestionApiRBAC
+  displayName: 'Run Document Ingestion API RBAC'
+  type: boolean
+  default: false
+- name: runBackendRBACv3
+  displayName: 'Run Backend API v3 RBAC'
+  type: boolean
+  default: false
+- name: runFrontendRBACv3
+  displayName: 'Run Frontend v3 RBAC'
+  type: boolean
+  default: false
+
+variables:
+- name: rgname
+  value: rg-cmfg-d01-psa-cognitiveservices-tf
+resources:
+  repositories:
+  - repository: atlasGitRepository
+    type: git
+    name: SecureCloudEnablement/Atlas
+
+stages:
+  - stage: RGDeployment
+    jobs:
+      - job: ResourceGroupDeployment
+        pool:
+          name: "Release-ITPortfolio-NP"
+        steps:
+          - checkout: self
+            clean: True
+          - task: deployAzureResourceGroup@3
+            displayName: "Create Resource Group"
+            inputs:
+              ConnectedServiceNameARM: 'CMFG NonProduction ITPortfolio'
+              rgType: 'standard'
+              enableForAtlas: 'atlasFalse'
+              ResourceGroupName: 'RG-CMFG-D01-PSA-CognitiveServices-TF'
+              cmdbAssetTag: '000091958'
+              roleGroup: 'R-App-AI-Truchat-Developers'
+              location: 'eastus'
+            enabled: false
+
+  - stage: plan
+    dependsOn: []
+    jobs:
+    - deployment: TerraformPlan
+      displayName: TerraformPlan
+      pool:
+        name: 'Release-ITPortfolio-NP'
+      environment: nonprod_infra_plan
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - checkout: self
+            - checkout: atlasGitRepository
+              clean: True
+            - task: TerraformInstaller@0
+              displayName: "Install Terraform"
+              inputs:
+                terraformVersion: 'latest'
+              enabled: True
+
+            - task: PowerShell@2
+              displayName: "Terraform Plan"
+              inputs:
+                targetType: 'inline'
+                script: |
+                  $geoblock = Get-Content .\Atlas\Common\constants.ps1
+                  $geoblock = ($geoblock | Select-String -Pattern '"RU"').Line.Trim(')').Replace(" ",'')
+                  $geoblock = $geoblock.replace(")-ScopeGlobal","")
+                  cd Deployment/terraform/OpenAITFModule
+                  start-sleep -seconds 10
+                  $content = get-content .\main.tf
+                  $content -replace ("__WORKSPACE_NAME__","WS-TruChat-Dev") | Set-Content .\main.tf
+                  gci | select fullname
+                  $geocontent = get-content ..\vars\dev.tfvars
+                  $geocontent -replace ("__GEOBLOCK__",$geoblock) | Set-Content ..\vars\dev.tfvars
+                  cp ..\vars\dev.tfvars terraform.tfvars
+                  terraform init
+                  terraform plan -out=tfplan
+              enabled: true
+              env:
+                TF_TOKEN_APP_TERRAFORM_IO: $(TF_TOKEN_app_terraform_io)
+
+            - task: PublishPipelineArtifact@1
+              inputs:
+                targetPath: 'Deployment/terraform/OpenAITFModule/tfplan'
+                artifact: 'tfplan'
+                publishLocation: 'pipeline'
+              displayName: 'Publish Terraform Plan Artifact'
+
+  - stage: apply
+    dependsOn: [plan]
+    jobs:
+    - deployment: TerraformApply
+      displayName: TerraformApply
+      pool:
+        name: 'Release-ITPortfolio-NP'
+      environment: nonprod_infra_apply
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - checkout: self
+              clean: True
+            - checkout: atlasGitRepository
+
+            - task: TerraformInstaller@0
+              displayName: "Install Terraform"
+              inputs:
+                terraformVersion: 'latest'
+              enabled: true
+
+            - task: DownloadPipelineArtifact@2
+              inputs:
+                artifact: 'tfplan'
+                path: 'Deployment/terraform/OpenAITFModule'
+              displayName: 'Download Terraform Plan Artifact'
+
+            - task: PowerShell@2
+              displayName: "Terraform Apply"
+              inputs:
+                targetType: 'inline'
+                script: |
+                  $geoblock = Get-Content .\Atlas\Common\constants.ps1
+                  $geoblock = ($geoblock | Select-String -Pattern '"RU"').Line.Trim(')').Replace(" ",'')
+                  $geoblock = $geoblock.replace(")-ScopeGlobal","")
+                  cd Deployment/terraform/OpenAITFModule
+                  start-sleep -seconds 10
+                  $content = get-content .\main.tf
+                  $content -replace ("__WORKSPACE_NAME__","WS-TruChat-Dev") | Set-Content .\main.tf
+                  gci | select fullname
+                  $geocontent = get-content ..\vars\dev.tfvars
+                  $geocontent -replace ("__GEOBLOCK__",$geoblock) | Set-Content ..\vars\dev.tfvars
+                  cp ..\vars\dev.tfvars terraform.tfvars
+                  terraform init
+                  terraform apply tfplan
+              enabled: True
+              condition: succeededOrFailed()
+              env:
+                TF_TOKEN_APP_TERRAFORM_IO: $(TF_TOKEN_app_terraform_io)
+  - stage: RBAC
+    displayName: 'Role-Based Access Control Configuration'
+    dependsOn: [apply]
+    pool:
+      name: "Release-ITPortfolio-NP"
+    jobs:
+      # Chat App RBAC Job
+      - template: templates/rbac-chatapp.yaml
+        parameters:
+          enabled: '${{ parameters.runChatAppRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+
+      # Translator RBAC Job  
+      - template: templates/rbac-translator.yaml
+        parameters:
+          enabled: '${{ parameters.runTranslatorRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+
+      # Mailbox RBAC Job
+      - template: templates/rbac-mailbox.yaml
+        parameters:
+          enabled: '${{ parameters.runMailboxRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+
+      # Backend RBAC Job
+      - template: templates/rbac-backend.yaml
+        parameters:
+          enabled: '${{ parameters.runBackendRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+
+      # Frontend RBAC Job
+      - template: templates/rbac-frontend.yaml
+        parameters:
+          enabled: '${{ parameters.runFrontendRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+
+      # KMS Training RBAC Job
+      - template: templates/rbac-kmstraining.yaml
+        parameters:
+          enabled: '${{ parameters.runKMSTrainingRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+
+      # Container Apps RBAC Job
+      - template: templates/rbac-containerapps.yaml
+        parameters:
+          enabled: '${{ parameters.runContainerAppsRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)' 
+      
+      - template: templates/rbac-coreapi.yaml
+        parameters:
+          enabled: '${{ parameters.runCoreApiRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+      
+      - template: templates/rbac-inference.yaml
+        parameters:
+          enabled: '${{ parameters.runInferenceRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+      
+      - template: templates/rbac-docIngestionapi.yaml
+        parameters:
+          enabled: '${{ parameters.runDocIngestionApiRBAC }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+      
+      - template: templates/rbac-backend-v3.yaml
+        parameters:
+          enabled: '${{ parameters.runBackendRBACv3 }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'
+
+      # Frontend RBAC Job
+      - template: templates/rbac-frontend-v3.yaml
+        parameters:
+          enabled: '${{ parameters.runFrontendRBACv3 }}'
+          environment: 'dev'
+          serviceConnection: 'CMFG NonProduction ITPortfolio'
+          resourceGroupName: '$(rgname)'

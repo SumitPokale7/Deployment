@@ -1,0 +1,54 @@
+parameters:
+- name: AzureDevOps_EnvironmentName
+  type: string
+- name: AzureSubscription
+  type: string
+- name: API_Def
+  type: string
+- name: Environment
+  type: string
+- name: FolderPath
+  type: string
+- name: SubscriptionKey
+  type: string
+- name: RoleGroupName
+  type: string
+- name: URL
+  type: string
+
+
+stages:
+ - stage: Deploy_Policy
+   displayName: 'Deploying Policy'
+   dependsOn:
+   pool:
+    vmImage: 'windows-latest'
+   variables:
+    - ${{ if eq(parameters.Environment, 'Dev') }}:
+      - template: /variables/dev.yaml
+    - ${{ if eq(parameters.Environment, 'Demo') }}:
+      - template: /variables/demo.yaml
+    - ${{ if eq(parameters.Environment, 'prod') }}:
+      - template: /variables/prod.yaml
+   jobs:
+    - deployment: deployPolicy
+      displayName: 'Deploy Policy'
+      environment: ${{ parameters.AzureDevOps_EnvironmentName}}
+      strategy:
+        runOnce:
+         deploy:
+          steps:
+          - checkout: self
+          - checkout: AzureAPIM
+          - task: ReplaceTokens@1
+            inputs:
+              sourcePath: '${{ parameters.FolderPath}}'
+              filePattern: '*.xml'
+              tokenRegex: '__(\w+)__'
+          - task: AzurePowerShell@5
+            inputs:
+              azureSubscription: '${{ parameters.AzureSubscription}}'
+              ScriptType: 'FilePath'
+              ScriptPath: '$(System.DefaultWorkingDirectory)/AzureAPIM/DeployPolicy.ps1'
+              ScriptArguments: '-FileName "${{ parameters.API_Def}}" -Environment "${{ parameters.Environment}}" -PolicyFolderPath "${{ parameters.FolderPath}}"'
+              azurePowerShellVersion: 'LatestVersion'

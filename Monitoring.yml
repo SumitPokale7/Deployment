@@ -1,0 +1,116 @@
+
+trigger: none
+parameters:
+
+# Default parameters
+- name: ResourceGroup
+  displayName: Resource Group
+  type: string
+  default: "RG-CMFG-P01-PSA-CognitiveServices-TF"
+- name: Name
+  displayName: Name Of Alert
+  type: string
+  default: "Severity3Alert"
+- name: Description
+  displayName: Description Of Alert
+  type: string
+  default: "This alert monitors the Application Insights resource for traces with a severity level of 3."
+- name: actionGroupName
+  displayName: Name Of Action group
+  type: string
+  default: "Email"
+- name: AppInsight
+  displayName: Name Of App insight
+  type: string
+  default: "ais-p01-ai-cognitive-tf"
+
+# query parameters
+
+- name: Condition
+  displayName: Condition Statement
+  type: string
+  default: "total 'itemCount' from 'traces | where severityLevel > 2' >= 1 where message includes *"
+
+
+
+pool:
+   name: 'InfinityHostedWindows'
+   vmImage: windows-2022
+
+steps:
+- task: AzureCLI@2
+  displayName: Create Action Group
+  inputs:
+    azureSubscription: 'CMFG Production ITPortfolio'
+    scriptType: 'ps'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      # Variables
+      $location = "centralus"
+
+      # Email recipients
+      $emailRecipients = @(
+          "achyuthnaidu.bellary@trustage.com",
+          "Azad.Periwal@trustage.com",
+          "Deepa.Vivek@trustage.com"
+      )
+
+      # Check if Action Group exists
+      $actionGroupExists = az monitor action-group show --resource-group ${{ parameters.ResourceGroup }} --name ${{ parameters.actionGroupName}} --query "id" -o tsv
+
+      if (-not $actionGroupExists) {
+          # Create Action Group if it does not exist
+          az monitor action-group create --name ${{ parameters.actionGroupName}} --short-name "Email" --resource-group ${{ parameters.ResourceGroup }} --action email "Achyuth-email" $emailRecipients[0]
+          Write-Host "Action Group '${{ parameters.actionGroupName}}' created."
+      } else {
+          Write-Host "Action Group '${{ parameters.actionGroupName}}' already exists. Updating..."
+          # Loop through email recipients and add them to the Action Group
+          foreach ($email in $emailRecipients) {
+              $receiverName = "$($email.Split('@')[0])-email"
+
+              # Check if the email receiver already exists
+              $exists = az monitor action-group show --resource-group ${{ parameters.ResourceGroup }} --name ${{ parameters.actionGroupName}} --query "emailReceivers[?emailAddress=='$email'].emailAddress" -o tsv
+
+              if (-not $exists) {
+                  # Update Action Group by adding email receiver
+                  az monitor action-group update --resource-group ${{ parameters.ResourceGroup }} --name ${{ parameters.actionGroupName}} --add-action email $receiverName $email
+                  Write-Host "Added email receiver: $email"
+              } else {
+                  Write-Host "Email receiver $email already exists."
+              }
+          }
+      }
+  enabled: true
+- task: AzureCLI@2
+  displayName: Create Scheduled Query Alert
+  inputs:
+    azureSubscription: 'CMFG Production ITPortfolio'
+    scriptType: 'ps'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+        az config set extension.use_dynamic_install=yes_without_prompt
+        $actionGroupid = az monitor action-group show --resource-group ${{ parameters.ResourceGroup }} --name ${{ parameters.actionGroupName}} --query "id" -o tsv
+        write-host $actionGroupid
+        $appinsightid = az monitor app-insights component show --resource-group ${{ parameters.ResourceGroup }} --app ${{ parameters.AppInsight}} --query "id" -o tsv
+        write-host $appinsightid
+        
+        # delete the scheduled-query
+        # az monitor scheduled-query delete --ids "/subscriptions/94f0eebc-4d31-4d69-bc92-dfc97103744a/resourceGroups/RG-CMFG-P01-PSA-CognitiveServices-TF/providers/Microsoft.Insights/scheduledqueryrules/Severity3Alerts" --yes -y
+        # az monitor scheduled-query delete --ids "/subscriptions/94f0eebc-4d31-4d69-bc92-dfc97103744a/resourceGroups/RG-CMFG-P01-PSA-CognitiveServices-TF/providers/Microsoft.Insights/scheduledqueryrules/Severity3Alert" --yes -y
+        
+        # Create the scheduled-query
+        az monitor scheduled-query create `
+        -g ${{ parameters.ResourceGroup }} `
+        -n ${{ parameters.Name }} `
+        --severity 1 `
+        --location centralus `
+        --description "${{ parameters.Description }}" `
+        --scopes "$appinsightid" `
+        --condition "${{ parameters.Condition }}" `
+        --action-groups "$actionGroupid"
+        
+        #update exsisting
+        #az monitor scheduled-query update --resource-group ${{ parameters.ResourceGroup }} --name ${{ parameters.Name }} --set autoMitigate=false
+
+ 
+

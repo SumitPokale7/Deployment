@@ -1,0 +1,36 @@
+{
+    "description": "WAF gateway for Azure AI congtivite services",
+    "subscriptionId": "$(SUBSCRIPTION_ID)",
+    "applicationGateway": {
+       "applicationGatewayName": "$(AG_WAF_NAME)",
+       "applicationGatewayRGName": "$(AG_WAF_RG_NAME)",
+       "location": "eastus2",
+       "tier": "WAF_v2",
+       "minCapacity": 0,
+       "maxCapacity": 10
+    },
+    "publicIPAddress": {
+       "vnetName": "VNet-CMFG-Atlas-Atlantis",
+       "vnetRGName": "RG-CMFG-NP1-Atlas-Infrastructure",
+       "subnetName": "VNet-CMFG-Atlas-Atlantis-public-subnet-v1",
+       "idleTimeout": 4
+    },
+    "sslCertificates": [
+       {
+          "certificateName":"$(SSL_CERTIFICATE_NAME)",
+          "certificatePrefix":"$(SSL_CERTIFICATE_NAME)",
+          "domains":[
+             {
+                "hostName":"$(HOST_NAME_TRUCHAT)",
+                "backendPools":[
+                   {
+                      "appName":"$(APP_NAME_TRUCHAT)",
+                      "fqdn":"$(APP_NAME_TRUCHAT).azurewebsites.net",
+                      "pathName":"root"
+                   }
+                ]
+             }
+          ]
+       }
+    ]
+ }

@@ -1,0 +1,344 @@
+{
+    "openapi": "3.0.1",
+    "info": {
+        "title": "TruStage Language Translator API",
+        "version": "v1"
+    },
+    "servers": [
+        {
+            "url": "https://dev-apimanager.trustage.com/aiservices/translation/v1"
+        },
+        {
+            "url": "https://dev-apimanager-int.trustage.com/aiservices/translation/v1"
+        },
+        {
+            "url": "https://dev-apimanager.cunamutual.com/aiservices/translation/v1"
+        },
+        {
+            "url": "https://apigatewaydemo.cunamutual.com/aiservices/translation/v1"
+        }
+    ],
+    "paths": {
+        "/healthcheck": {
+            "get": {
+                "summary": "Health",
+                "description": "Health",
+                "operationId": "health_api_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/jobstatus": {
+            "get": {
+                "summary": "Get Document Translation Job Status",
+                "description": "Get the status of a document translation job.\nArgs:\n    job_id (str): The core job ID (without 'job_' prefix or '.json' extension).\n    user (User): The authenticated user making the request.\nReturns:\n    dict: The status of the job.",
+                "operationId": "get_document_translation_job_status_api_v1_status__get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                },
+                                "example": {
+                                    "detail": [
+                                        {
+                                            "loc": [
+                                                {}
+                                            ],
+                                            "msg": "string",
+                                            "type": "string"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/process-documents": {
+            "post": {
+                "summary": "Process Documents For Translation",
+                "description": "Process documents for Signature section removal and translation.\n\nArgs:\n    batch_folder_path (str): The relative path to the batch folder in the blob container.\n        This should be the path where the documents are stored, e.g., 'Batch1' or 'Batch1/subbatch1'.\n    disclaimer_message (str): The disclaimer message to be added to the document. Default will be used if not provided.Additional Valdiation is done in the function for the length of the message.\n    target_language_code (str): The target language code for translation.\n    enable_translation_step (bool): Whether to enable the translation step.Default is True.\n    enable_signature_removal_step (bool): Whether to enable the signature removal step.Default is True.\n    enable_evaluation_agent_step (bool): Whether to enable the evaluation agent step.Default is True.\n    enable_disclaimer_addition_step (bool): Whether to enable the disclaimer addition step.Default is True.\n    enable_glossary_feature (bool): Whether to enable the glossary feature for translation. Default is False.\n    glossary_file_name (str): The name of the glossary file stored in the S3 bucket. Required if enable_glossary_feature is True. Make sure your glossary file is in the following path in the s3 bucket: translation/translator-glossary-data\n    user (User): The authenticated user making the request.\n\nReturns:\n    dict: Acknowledgment message with request id and status.",
+                "operationId": "process_documents_for_translation_api_v1_translation_process_documents_post",
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "required": [
+                                    "batch_folder_path",
+                                    "target_language_code"
+                                ],
+                                "properties": {
+                                    "batch_folder_path": {
+                                        "type": "string",
+                                        "description": "Batch Folder Path"
+                                    },
+                                    "disclaimer_message": {
+                                        "type": "string",
+                                        "description": "Disclaimer Message"
+                                    },
+                                    "target_language_code": {
+                                        "type": "string",
+                                        "description": "Target Language Code"
+                                    },
+                                    "enable_translation_step": {
+                                        "type": "boolean",
+                                        "description": "Enable Translation Step",
+                                        "default": true
+                                    },
+                                    "enable_signature_removal_step": {
+                                        "type": "boolean",
+                                        "description": "Enable Signature Removal Step",
+                                        "default": true
+                                    },
+                                    "enable_evaluation_agent_step": {
+                                        "type": "boolean",
+                                        "description": "Enable Evaluation Agent Step",
+                                        "default": true
+                                    },
+                                    "enable_disclaimer_addition_step": {
+                                        "type": "boolean",
+                                        "description": "Enable Disclaimer Addition Step",
+                                        "default": true
+                                    },
+                                    "enable_glossary_feature": {
+                                        "type": "boolean",
+                                        "description": "Enable Glossary Feature",
+                                        "default": false
+                                    },
+                                    "glossary_file_name": {
+                                        "type": "string",
+                                        "description": "Glossary File Name"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                },
+                                "example": {
+                                    "detail": [
+                                        {
+                                            "loc": [
+                                                {}
+                                            ],
+                                            "msg": "string",
+                                            "type": "string"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Body_process_documents_for_translation_api_v1_translation_process_documents_post": {
+                "title": "Body_process_documents_for_translation_api_v1_translation_process_documents_post",
+                "required": [
+                    "batch_folder_path",
+                    "target_language_code"
+                ],
+                "type": "object",
+                "properties": {
+                    "batch_folder_path": {
+                        "title": "Batch Folder Path",
+                        "type": "string",
+                        "description": "Relative path to the batch folder in the blob container (e.g., 'Batch1' or 'Batch1/subbatch1'). S3 path: translation/translator-input-data, Upload your files to this path in s3 bucket before submitting the request."
+                    },
+                    "disclaimer_message": {
+                        "title": "Disclaimer Message",
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "default": ""
+                    },
+                    "target_language_code": {
+                        "title": "Target Language Code",
+                        "type": "string",
+                        "description": "Target language code for translation (e.g., 'en', 'fr'). Latest supported language codes can be found in the documentation: https://learn.microsoft.com/en-us/azure/ai-services/translator/language-support."
+                    },
+                    "enable_translation_step": {
+                        "title": "Enable Translation Step",
+                        "type": "boolean",
+                        "description": "Whether to enable the translation step. Example: True/False",
+                        "default": true
+                    },
+                    "enable_signature_removal_step": {
+                        "title": "Enable Signature Removal Step",
+                        "type": "boolean",
+                        "description": "Whether to enable the signature removal step. Example: True/False",
+                        "default": true
+                    },
+                    "enable_evaluation_agent_step": {
+                        "title": "Enable Evaluation Agent Step",
+                        "type": "boolean",
+                        "description": "Whether to enable the evaluation agent step. Example: True/False",
+                        "default": true
+                    },
+                    "enable_disclaimer_addition_step": {
+                        "title": "Enable Disclaimer Addition Step",
+                        "type": "boolean",
+                        "description": "Whether to enable the disclaimer addition step. Example: True/False",
+                        "default": true
+                    },
+                    "enable_glossary_feature": {
+                        "title": "Enable Glossary Feature",
+                        "type": "boolean",
+                        "description": "Whether to enable the glossary feature for translation. Default is False.",
+                        "default": false
+                    },
+                    "glossary_file_name": {
+                        "title": "Glossary File Name",
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Name of the glossary file stored in the S3 bucket. Required if enable_glossary_feature is True. Glossary file should be in the following path in the s3 bucket: translation/translator-glossary-data"
+                    }
+                }
+            },
+            "HTTPValidationError": {
+                "title": "HTTPValidationError",
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "title": "Detail",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        }
+                    }
+                }
+            },
+            "HealthCheckErrorResponse": {
+                "title": "HealthCheckErrorResponse",
+                "required": [
+                    "detail"
+                ],
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "title": "Detail",
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "HealthCheckResponse": {
+                "title": "HealthCheckResponse",
+                "required": [
+                    "status"
+                ],
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "title": "Status",
+                        "type": "string"
+                    }
+                }
+            },
+            "ValidationError": {
+                "title": "ValidationError",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "type": "object",
+                "properties": {
+                    "loc": {
+                        "title": "Location",
+                        "type": "array",
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    "msg": {
+                        "title": "Message",
+                        "type": "string"
+                    },
+                    "type": {
+                        "title": "Error Type",
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "securitySchemes": {
+            "apiKeyHeader": {
+                "type": "apiKey",
+                "name": "Ocp-Apim-Subscription-Key",
+                "in": "header"
+            },
+            "apiKeyQuery": {
+                "type": "apiKey",
+                "name": "subscription-key",
+                "in": "query"
+            }
+        }
+    },
+    "security": [
+        {
+            "apiKeyHeader": []
+        },
+        {
+            "apiKeyQuery": []
+        }
+    ]
+}

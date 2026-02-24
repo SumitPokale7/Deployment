@@ -1,0 +1,37 @@
+{
+    "apis": [
+      {
+        "name": "AI TruStage Language Translator Service",
+        "definitionfile": "translation-openai.json",
+        "backend_uri": "__backend_uri__",
+        "protocol": "https",
+        "schemaFileFormat": "OpenApi",
+        "api_path": "aiservices/translation",
+        "ApiVersion": "v1",
+        "Description": "Team: AITeam; Contact email: DS-GenAI-Onshore@trustage.com",
+        "policies": [
+          {
+            "name": "jwt-policy",
+            "path": "jwt-policy.xml"
+          }
+        ],
+        "Operations": [
+          {
+            "Operation": "health_api_health_get",
+            "name": "translation-healthcheck-policy",
+            "path": "translation-healthcheck-policy.xml"
+          },
+          {
+            "Operation": "get_document_translation_job_status_api_v1_status__get",
+            "name": "translation-jobstatus-policy",
+            "path": "translation-jobstatus-policy.xml"
+          },
+          {
+            "Operation": "process_documents_for_translation_api_v1_translation_process_documents_post",
+            "name": "translation-policy",
+            "path": "translation-policy.xml"
+          }
+        ]
+      }
+    ]
+  }

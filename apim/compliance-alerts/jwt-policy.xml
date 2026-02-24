@@ -1,0 +1,95 @@
+<policies>
+    <inbound>
+        <set-variable name="isBasicAuth" value="@(context.Request.Headers.GetValueOrDefault("Authorization").AsBasic()!=null)" />
+        <set-variable name="isJwtAuth" value="@(context.Request.Headers.GetValueOrDefault("Authorization").AsJwt()!=null)" />
+        <set-variable name="basicAuth" value="@(context.Request.Headers.GetValueOrDefault("Authorization"))" />
+        <base />
+        <choose>
+            <!-- Validate User Name and Password are passed as part of Basic Auth -->
+            <when condition="@(context.Variables.GetValueOrDefault<bool>("isBasicAuth"))">
+                <!-- Call backend api to get bearer token -->
+                <send-request ignore-error="false" timeout="20" response-variable-name="passwordResponse" mode="new">
+                    <set-url>https://__URL__/__OpenidconnectAuthApim__/token/V1/as/token.oauth2</set-url>
+                    <set-method>POST</set-method>
+                    <set-header name="Ocp-Apim-Subscription-Key" exists-action="override">
+                        <value>__SubscriptionKey__</value>
+                    </set-header>
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/x-www-form-urlencoded</value>
+                    </set-header>
+                    <set-body>@{string body = "grant_type=password&scope=openid%20profile%20address%20email&username="+context.Request.Headers.GetValueOrDefault("Authorization").AsBasic().UserId + "&password=" + context.Request.Headers.GetValueOrDefault("Authorization").AsBasic().Password;
+                     return body;
+                     }</set-body>
+                </send-request>
+                <!-- validate bearer token response -->
+                <choose>
+                    <when condition="@(((IResponse)context.Variables["passwordResponse"]).StatusCode == 200)">
+                        <!-- Parse Bearer token from the response message -->
+                        <set-variable name="bearertoken" value="@{ 
+                            JObject json = ((IResponse)context.Variables["passwordResponse"]).Body.As<JObject>();
+                            string access_token = json.GetValue("access_token").ToString();
+                            return access_token;
+                        }" />
+                        <!-- set authentication header to Bearer -->
+                        <set-header name="Authorization" exists-action="override">
+                            <value>@("Bearer " + (string)context.Variables["bearertoken"])</value>
+                        </set-header>
+                        <!--- validate if the user is part of the role group -->
+                        <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="User is not in the role group" require-scheme="Bearer">
+                            <openid-config url="https://__URL__/__OpenidConfigApim__/V1/.well-known/openid-configuration?subscription-key=__SubscriptionKey__" />
+                            <audiences>
+                                <audience>CUNA:JWT</audience>
+                            </audiences>
+                            <required-claims>
+                                <claim name="memberof" match="any" separator=":">
+                                    <value>CN=__RoleGroupName__</value>
+                                </claim>
+                            </required-claims>
+                        </validate-jwt>
+                    </when>
+                    <otherwise>
+                        <return-response>
+                            <set-status code="401" reason="Unauthorized" />
+                            <set-header name="WWW-Authenticate" exists-action="override">
+                                <value>Basic realm="someRealm"</value>
+                            </set-header>
+                            <set-body>Wrong username or password</set-body>
+                        </return-response>
+                    </otherwise>
+                </choose>
+            </when>
+            <!-- checking to see if authorization is JWT -->
+            <when condition="@(context.Variables.GetValueOrDefault<bool>("isJwtAuth"))">
+                <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="User is not in the role group" require-scheme="Bearer">
+                    <openid-config url="https://__URL__/__OpenidConfigApim__/V1/.well-known/openid-configuration?subscription-key=__SubscriptionKey__" />
+                    <audiences>
+                        <audience>CUNA:JWT</audience>
+                    </audiences>
+                    <required-claims>
+                        <claim name="memberof" match="any" separator=":">
+                            <value>CN=__RoleGroupName__</value>
+                        </claim>
+                    </required-claims>
+                </validate-jwt>
+            </when>
+            <otherwise>
+                <return-response>
+                    <set-status code="401" reason="Unauthorized" />
+                    <set-header name="WWW-Authenticate" exists-action="override">
+                        <value>Basic realm="someRealm"</value>
+                    </set-header>
+                    <set-body>Please pass JWTToken or BasicAuth for Authorization</set-body>
+                </return-response>
+            </otherwise>
+        </choose>
+    </inbound>
+    <backend>
+        <forward-request timeout="120" />
+    </backend>
+    <outbound>
+        <set-header name="Set-Cookie" exists-action="delete" />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>

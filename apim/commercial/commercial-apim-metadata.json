@@ -1,0 +1,27 @@
+{
+    "apis": [
+      {
+        "name": "Commercial MailBox",
+        "definitionfile": "commercial-openai.json",
+        "backend_uri": "__backend_uri__",
+        "protocol": "https",
+        "schemaFileFormat": "OpenApi",
+        "api_path": "/commercial",
+        "ApiVersion": "v1",
+        "Description": "Team: AITeam; Contact email: DS-GenAI-Onshore@trustage.com",
+        "policies": [
+          {
+            "name": "jwt-policy",
+            "path": "jwt-policy.xml"
+          }
+        ],
+        "Operations": [
+          {
+            "Operation": "categorize_email_api_v1_email_classify_post",
+            "name": "email-classify-policy",
+            "path": "email-classify-policy.xml"
+          }
+        ]
+      }
+    ]
+  }

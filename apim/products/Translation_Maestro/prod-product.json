@@ -1,0 +1,28 @@
+{
+    "productinput": [
+        {
+            "title": "Translation_Maestro",
+            "description": "A subscription to the Translation Maestro API.",
+            "LegalTerms": "",
+            "apis": [
+                {
+                    "name": "openid-connect-discovery",
+                    "version": "V1"
+                },
+                {
+                    "name": "openid-connect-authorization",
+                    "version": "V1"
+                },
+                {
+                    "name": "AI TruStage Language Translator Service",
+                    "version": "V1"
+                }
+            ],
+            "groups": [
+                {
+                    "name": "Developers"
+                }
+            ]
+        }
+    ]
+}

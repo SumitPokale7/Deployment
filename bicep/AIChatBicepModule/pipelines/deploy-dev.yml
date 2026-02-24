@@ -1,0 +1,288 @@
+# ============================================================================
+# Dev Environment Infrastructure Pipeline
+# Deploys AI Chat Application infrastructure to Dev
+# ============================================================================
+
+trigger: none
+
+# Prevent concurrent runs to avoid deployment conflicts
+lockBehavior: sequential
+
+resources:
+  repositories:
+  - repository: atlasGitRepository
+    type: git
+    name: SecureCloudEnablement/Atlas
+
+parameters:
+  - name: deploymentMode
+    displayName: 'Deployment Mode'
+    type: string
+    default: 'Incremental'
+    values:
+      - Incremental
+      - Complete
+  - name: skipDeploy
+    displayName: 'Skip Deploy (What-If Only)'
+    type: boolean
+    default: false
+
+variables:
+  - name: subscriptionId
+    value: '059ed1ab-6824-4344-9a65-a0504248340f'
+  - name: resourceGroupName
+    value: 'rg-cmfg-d01-psa-cognitiveservices-tf'
+  - name: location
+    value: 'centralus'
+  - name: deploymentName
+    value: 'ai-chat-dev'
+  - name: templateFile
+    value: 'Deployment/bicep/AIChatBicepModule/main.bicep'
+  - name: parameterFile
+    value: 'Deployment/bicep/AIChatBicepModule/vars/dev.bicepparam'
+  - name: azureServiceConnection
+    value: 'CMFG NonProduction ITPortfolio'
+
+stages:
+  - stage: Validation
+    displayName: 'Validate Dev Infrastructure'
+    jobs:
+      - job: ValidateDeployment
+        displayName: 'Validate & What-If Analysis'
+        timeoutInMinutes: 30
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+        - checkout: self
+          fetchDepth: 1
+        - checkout: atlasGitRepository
+          clean: true
+
+        - task: PowerShell@2
+          displayName: 'Inject Dynamic Geo-Block Countries'
+          inputs:
+            targetType: 'inline'
+            script: |
+              Write-Host "=== Fetching Geo-Block Countries from Atlas ==="
+              $geoblock = Get-Content .\Atlas\Common\constants.ps1
+              $geoblock = ($geoblock | Select-String -Pattern '"RU"').Line.Trim(')').Replace(" ",'')
+              $geoblock = $geoblock.replace(")-ScopeGlobal","")
+              
+              # Convert to Bicep array format: 'RU', 'CN', etc. -> ['RU', 'CN']
+              $countries = $geoblock -split ',' | ForEach-Object { $_.Trim().Trim('"') }
+              $bicepArray = "[" + (($countries | ForEach-Object { "'$_'" }) -join ", ") + "]"
+              
+              Write-Host "Geo-blocked countries: $bicepArray"
+              
+              # Update the bicepparam file
+              $paramFile = "Deployment/bicep/AIChatBicepModule/vars/dev.bicepparam"
+              $content = Get-Content $paramFile -Raw
+              $content = $content -replace "param blackListedCountries = \[.*?\]", "param blackListedCountries = $bicepArray"
+              Set-Content $paramFile $content
+              
+              Write-Host "✅ Geo-block countries injected into dev.bicepparam"
+
+        - task: AzureCLI@2
+          displayName: 'Install & Verify Bicep CLI'
+          inputs:
+            azureSubscription: '$(azureServiceConnection)'
+            scriptType: 'bash'
+            scriptLocation: 'inlineScript'
+            failOnStandardError: true
+            inlineScript: |
+              set -e
+              az bicep install
+              az bicep version
+              echo "✅ Bicep CLI ready"
+
+        - task: AzureCLI@2
+          displayName: 'Lint & Build Bicep Template'
+          inputs:
+            azureSubscription: '$(azureServiceConnection)'
+            scriptType: 'bash'
+            scriptLocation: 'inlineScript'
+            failOnStandardError: true
+            inlineScript: |
+              set -e
+              echo "=== Linting Bicep Template ==="
+              az bicep lint --file $(templateFile) || true
+              
+              echo ""
+              echo "=== Building Bicep Template ==="
+              az bicep build --file $(templateFile)
+              echo "✅ Bicep build successful"
+
+        - task: AzureCLI@2
+          displayName: 'Validate Template'
+          inputs:
+            azureSubscription: '$(azureServiceConnection)'
+            scriptType: 'bash'
+            scriptLocation: 'inlineScript'
+            failOnStandardError: true
+            inlineScript: |
+              set -e
+              echo "=== Template Validation ==="
+              az deployment group validate \
+                --resource-group $(resourceGroupName) \
+                --template-file $(templateFile) \
+                --parameters $(parameterFile) \
+                --name $(deploymentName)-validate-$(Build.BuildId)
+              echo "✅ Template validation passed"
+
+        - task: AzureCLI@2
+          displayName: 'What-If Analysis (${{ parameters.deploymentMode }} Mode)'
+          inputs:
+            azureSubscription: '$(azureServiceConnection)'
+            scriptType: 'bash'
+            scriptLocation: 'inlineScript'
+            failOnStandardError: false
+            inlineScript: |
+              set -e
+              echo "=== What-If Analysis (${{ parameters.deploymentMode }} Mode) ==="
+              echo "Environment: Dev"
+              echo "Resource Group: $(resourceGroupName)"
+              echo ""
+              echo "Legend: + Create | ~ Modify | - Delete | = NoChange | * Ignore"
+              echo "================================================================"
+              
+              # Run What-If and save output
+              az deployment group what-if \
+                --resource-group $(resourceGroupName) \
+                --template-file $(templateFile) \
+                --parameters $(parameterFile) \
+                --name $(deploymentName)-whatif-$(Build.BuildId) \
+                --mode ${{ parameters.deploymentMode }} \
+                --result-format FullResourcePayloads \
+                --no-pretty-print > $(Build.ArtifactStagingDirectory)/whatif-output.json 2>&1 || true
+              
+              # Display formatted output
+              az deployment group what-if \
+                --resource-group $(resourceGroupName) \
+                --template-file $(templateFile) \
+                --parameters $(parameterFile) \
+                --name $(deploymentName)-whatif-$(Build.BuildId) \
+                --mode ${{ parameters.deploymentMode }} \
+                --result-format FullResourcePayloads
+              
+              echo ""
+              echo "================================================================"
+              if [ "${{ parameters.deploymentMode }}" == "Complete" ]; then
+                echo "⚠️  WARNING: Complete mode will DELETE resources not in template!"
+              fi
+
+        - task: PublishBuildArtifacts@1
+          displayName: 'Publish What-If Results'
+          inputs:
+            PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+            ArtifactName: 'whatif-results'
+            publishLocation: 'Container'
+          condition: always()
+
+  - stage: Deploy
+    displayName: 'Deploy to Dev'
+    dependsOn: Validation
+    condition: and(succeeded(), eq('${{ parameters.skipDeploy }}', false))
+    jobs:
+      - deployment: DeployAIChat
+        displayName: 'Deploy AI Chat Infrastructure'
+        environment: 'dev_infra_apply'
+        timeoutInMinutes: 120
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - checkout: self
+                fetchDepth: 1
+              - checkout: atlasGitRepository
+                clean: true
+
+              - task: PowerShell@2
+                displayName: 'Inject Dynamic Geo-Block Countries'
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    $geoblock = Get-Content .\Atlas\Common\constants.ps1
+                    $geoblock = ($geoblock | Select-String -Pattern '"RU"').Line.Trim(')').Replace(" ",'')
+                    $geoblock = $geoblock.replace(")-ScopeGlobal","")
+                    $countries = $geoblock -split ',' | ForEach-Object { $_.Trim().Trim('"') }
+                    $bicepArray = "[" + (($countries | ForEach-Object { "'$_'" }) -join ", ") + "]"
+                    $paramFile = "Deployment/bicep/AIChatBicepModule/vars/dev.bicepparam"
+                    $content = Get-Content $paramFile -Raw
+                    $content = $content -replace "param blackListedCountries = \[.*?\]", "param blackListedCountries = $bicepArray"
+                    Set-Content $paramFile $content
+                    Write-Host "✅ Geo-block countries injected"
+
+              - task: AzureCLI@2
+                displayName: 'Deploy Infrastructure (${{ parameters.deploymentMode }} Mode)'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  failOnStandardError: true
+                  inlineScript: |
+                    set -e
+                    echo "=== Deploying AI Chat Infrastructure to Dev ==="
+                    echo "Deployment Name: $(deploymentName)-$(Build.BuildId)"
+                    echo "Resource Group: $(resourceGroupName)"
+                    echo "Mode: ${{ parameters.deploymentMode }}"
+                    echo ""
+                    
+                    az deployment group create \
+                      --resource-group $(resourceGroupName) \
+                      --template-file $(templateFile) \
+                      --parameters $(parameterFile) \
+                      --name $(deploymentName)-$(Build.BuildId) \
+                      --mode ${{ parameters.deploymentMode }} \
+                      --verbose
+                    
+                    echo ""
+                    echo "✅ Deployment completed successfully"
+                enabled: false
+
+              - task: AzureCLI@2
+                displayName: 'Verify Deployment & Capture Outputs'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  failOnStandardError: false
+                  inlineScript: |
+                    set -e
+                    echo "=== Deployment Summary ==="
+                    az deployment group show \
+                      --name $(deploymentName)-$(Build.BuildId) \
+                      --resource-group $(resourceGroupName) \
+                      --query "{Status:properties.provisioningState, Duration:properties.duration, Mode:properties.mode, Timestamp:properties.timestamp}" \
+                      --output table
+                    
+                    echo ""
+                    echo "=== Deployment Outputs ==="
+                    az deployment group show \
+                      --name $(deploymentName)-$(Build.BuildId) \
+                      --resource-group $(resourceGroupName) \
+                      --query "properties.outputs" \
+                      --output json
+                    
+                    # Save outputs for downstream use
+                    az deployment group show \
+                      --name $(deploymentName)-$(Build.BuildId) \
+                      --resource-group $(resourceGroupName) \
+                      --query "properties.outputs" \
+                      --output json > $(Build.ArtifactStagingDirectory)/deployment-outputs.json
+                    
+                    echo ""
+                    echo "=== Resource Count ==="
+                    az resource list --resource-group $(resourceGroupName) \
+                      --query "length(@)" \
+                      --output tsv | xargs -I {} echo "Total resources: {}"
+                enabled: false
+
+              - task: PublishBuildArtifacts@1
+                displayName: 'Publish Deployment Outputs'
+                inputs:
+                  PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+                  ArtifactName: 'deployment-outputs'
+                  publishLocation: 'Container'
+                condition: succeeded()

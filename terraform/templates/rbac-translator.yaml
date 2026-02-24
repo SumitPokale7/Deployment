@@ -1,0 +1,182 @@
+# Translator Service RBAC Job Template
+# This template handles RBAC configuration for the Translation Service
+
+parameters:
+- name: environment
+  type: string
+- name: serviceConnection
+  type: string
+- name: resourceGroupName
+  type: string
+- name: enabled
+  type: boolean
+  default: true
+
+jobs:
+- job: translator_RoleBasedAccessControl
+  displayName: 'Translator Service RBAC Configuration'
+  pool:
+    name: "Release-ITPortfolio-NP"
+  condition: eq('${{ parameters.enabled }}', true)
+  steps:
+    - checkout: self
+      clean: true
+      
+    - task: AzurePowerShell@5
+      displayName: "Get Resource IDs for Translator RBAC"
+      inputs:
+        azureSubscription: '${{ parameters.serviceConnection }}'
+        ScriptType: 'InlineScript'
+        Inline: |
+          $localrgname = "${{ parameters.resourceGroupName }}"
+          
+          # Determine environment prefix
+          $environment = "${{ parameters.environment }}"
+          $envPrefix = switch ($environment.ToLower()) {
+            "prod" { "p01" }
+            "demo" { "m01" }
+            "dev"  { "d01" }
+            default { "d01" }
+          }
+          
+          # Set ACR ID based on environment
+          $acrId = if ("${{ parameters.environment }}" -eq "prod") {
+            "/subscriptions/94f0eebc-4d31-4d69-bc92-dfc97103744a/resourceGroups/rg-cmfg-p01-psa-cognitiveservices-tf/providers/Microsoft.ContainerRegistry/registries/acraiservicesprod"
+          } else {
+            "/subscriptions/059ed1ab-6824-4344-9a65-a0504248340f/resourceGroups/rg-cmfg-d01-psa-cognitiveservices-tf/providers/Microsoft.ContainerRegistry/registries/acraiservicesnonprod"
+          }
+          Write-Host "##vso[task.setvariable variable=acrId]$acrId"
+          
+          # Get translator container app system assigned managed identity
+          $translator_sami = (Get-AzContainerApp -ResourceGroupName $localrgname | Where-Object Name -eq "ca-$envPrefix-ai-translationapi-tf").IdentityPrincipalId
+          Write-Host "##vso[task.setvariable variable=translator_sami]$translator_sami"
+          $saidlocal = (Get-AZStorageAccount -ResourceGroupName $localrgname).Id
+          Write-Host "##vso[task.setvariable variable=said]$saidlocal"
+          
+          $oaiidlocal = (Get-AzCognitiveServicesAccount -ResourceGroupName $localrgname | Where-Object AccountType -eq "OpenAI").id
+          $oaiidlocal1 = $oaiidlocal[0]
+          $oaiidlocal2 = $oaiidlocal[1]
+          Write-Host "##vso[task.setvariable variable=oaiid1]$oaiidlocal1"
+          Write-Host "##vso[task.setvariable variable=oaiid2]$oaiidlocal2"
+          $cdbidlocal = (Get-AzResource -ResourceGroupName $localrgname | where-object resourcetype -eq "Microsoft.DocumentDB/databaseAccounts").Id
+          Write-Host "##vso[task.setvariable variable=cdbid]$cdbidlocal"
+          $cdbname = (Get-AzResource -ResourceGroupName $localrgname | where-object resourcetype -eq "Microsoft.DocumentDB/databaseAccounts").Name
+          Write-Host "##vso[task.setvariable variable=cdbname]$cdbname"
+          
+          $kv_idlocal = (Get-AzKeyVault -VaultName  "kv-$envPrefix-ai-cognitive-tf").ResourceId
+          Write-Host "##vso[task.setvariable variable=kv_id]$kv_idlocal"
+          $translationServiceId = (Get-AzCognitiveServicesAccount -ResourceGroupName $localrgname | Where-Object AccountType -eq "TextTranslation").Id
+          Write-Host "##vso[task.setvariable variable=translationServiceId]$translationServiceId"
+          $translationService_sami = (Get-AzCognitiveServicesAccount -ResourceGroupName $localrgname | Where-Object AccountType -eq "TextTranslation").identity.principalId
+          Write-Host "##vso[task.setvariable variable=translationService_sami]$translationService_sami"
+          
+
+        azurePowerShellVersion: LatestVersion
+      enabled: true
+      
+    - task: AzureCLI@2
+      displayName: "custom Role for Cosmos DB"
+      inputs:
+        azureSubscription: '${{ parameters.serviceConnection }}'
+        scriptType: 'ps'
+        scriptLocation: 'inlineScript'
+        inlineScript: 'az cosmosdb sql role assignment create -a $(cdbname) -g ${{ parameters.resourceGroupName }} -s "/" -p $(translator_sami) -d 00000000-0000-0000-0000-000000000002'
+      enabled: true
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Storage Blob Data Contributor for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(said)
+        identity: $(translator_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Storage Blob Data Contributor'
+      enabled: true
+      
+    - task: deployAzureRbacChanges@1
+      displayName: "Storage Queue Data Contributor for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(said)
+        identity: $(translator_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Storage queue Data Contributor'
+      enabled: true
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Cosmos DB Operator for User Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(cdbid)
+        identity: $(translator_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Cosmos DB Operator'
+      enabled: true
+      
+    - task: deployAzureRbacChanges@1
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(oaiid1)
+        identity: $(translator_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Cognitive Services OpenAI User'
+      enabled: true
+      
+    - task: deployAzureRbacChanges@1
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(oaiid2)
+        identity: $(translator_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Cognitive Services OpenAI User'
+      enabled: true
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Key vault secrets officer for translator system Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(kv_id)
+        identity: $(translator_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Key Vault Secrets Officer '
+      enabled: true
+
+    - task: deployAzureRbacChanges@1
+      displayName: "Key vault reader for translator system Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(kv_id)
+        identity: $(translator_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Key Vault Reader'
+      enabled: true
+      
+    - task: deployAzureRbacChanges@1
+      displayName: "Cognitive Services User for system Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(translationServiceId)
+        identity: $(translator_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Cognitive Services User'
+      enabled: true
+
+    - task: deployAzureRbacChanges@1
+      displayName: "acrpull for translator container app system Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(acrId)
+        identity: $(translator_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'acrpull'
+      enabled: true           
+      
+    - task: deployAzureRbacChanges@1
+      displayName: "Storage Blob Data Contributor for translation service system Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(said)
+        identity: $(translationService_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'Storage Blob Data Contributor'
+      enabled: true

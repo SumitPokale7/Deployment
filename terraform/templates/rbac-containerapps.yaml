@@ -1,0 +1,82 @@
+# Container Apps RBAC Job Template
+# This template handles RBAC configuration for Container Apps and ACR
+
+parameters:
+- name: environment
+  type: string
+- name: serviceConnection
+  type: string
+- name: resourceGroupName
+  type: string
+- name: enabled
+  type: boolean
+  default: true
+
+jobs:
+- job: ContainerAppsRBAC
+  displayName: 'Container Apps RBAC Configuration'
+  pool:
+    name: "Release-ITPortfolio-NP"
+  condition: eq('${{ parameters.enabled }}', true)
+  steps:
+    - checkout: self
+      clean: true
+      
+    - task: AzurePowerShell@5
+      displayName: "Get Resource IDs for Container Apps RBAC"
+      inputs:
+        azureSubscription: '${{ parameters.serviceConnection }}'
+        ScriptType: 'InlineScript'
+        Inline: |
+          $localrgname = "${{ parameters.resourceGroupName }}"
+          
+          # Set ACR ID based on environment
+          $acrId = if ("${{ parameters.environment }}" -eq "prod") {
+            "/subscriptions/$((Get-AzContext).Subscription.Id)/resourceGroups/rg-cmfg-p01-psa-cognitiveservices-tf/providers/Microsoft.ContainerRegistry/registries/acraiservicesprod"
+          } else {
+            "/subscriptions/059ed1ab-6824-4344-9a65-a0504248340f/resourceGroups/rg-cmfg-d01-psa-cognitiveservices-tf/providers/Microsoft.ContainerRegistry/registries/acraiservicesnonprod"
+          }
+          Write-Host "##vso[task.setvariable variable=acrId]$acrId"
+          
+          # Get Managed Environment Principal ID
+          $managedEnvPrincipalId = (Get-AzResource -ResourceGroupName $localrgname | Where-Object ResourceType -eq "Microsoft.App/managedEnvironments").Identity.PrincipalId
+          Write-Host "##vso[task.setvariable variable=managedEnvPrincipalId]$managedEnvPrincipalId"
+          
+        azurePowerShellVersion: 'LatestVersion'
+      enabled: true
+
+    # ACR Pull permission for Managed Environment Identity
+    - task: deployAzureRbacChanges@1
+      displayName: "AcrPull for Managed Environment Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(acrId)
+        identity: $(managedEnvPrincipalId)
+        permissionsAction: 'permissionAdd'
+        permissions: 'AcrPull'
+      enabled: true
+      condition: succeededOrFailed()
+
+    # Production-only: ACR Pull for Service Principal
+    - task: deployAzureRbacChanges@1
+      displayName: "AcrPull for SP-RM-ITPortfolio-P"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(acrId)
+        identity: "SP-RM-ITPortfolio-P"
+        permissionsAction: 'permissionAdd'
+        permissions: 'AcrPull'
+      enabled: ${{ eq(parameters.environment, 'prod') }}
+      condition: succeededOrFailed()
+
+    # Production-only: ACR Push for Service Principal
+    - task: deployAzureRbacChanges@1
+      displayName: "AcrPush for SP-RM-ITPortfolio-P"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(acrId)
+        identity: "SP-RM-ITPortfolio-P"
+        permissionsAction: 'permissionAdd'
+        permissions: 'AcrPush'
+      enabled: ${{ eq(parameters.environment, 'prod') }}
+      condition: succeededOrFailed()

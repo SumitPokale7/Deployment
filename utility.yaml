@@ -1,0 +1,35 @@
+trigger: none
+stages:
+  - stage: np
+    dependsOn: []
+    jobs:
+    - deployment: ListKVCerts
+      displayName: ListKVCerts
+      environment: nonprod_infra_plan
+      pool:
+        name: 'Release-ITPortfolio-NP'
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - task: AzurePowerShell@5
+              displayName: List NP KV Certs
+              inputs:
+                azureSubscription: 'CMFG NonProduction ITPortfolio'
+                ScriptType: 'InlineScript'
+                Inline: |
+                  # (Get-AzKeyVault -VaultName kv-atlas-ITPortfolio-np | Get-AzKeyVaultCertificate).name
+                  (Get-AzKeyVault -VaultName kv-atlas-ITPortfolio-np | Get-AzKeyVaultCertificate | select *)
+                azurePowerShellVersion: 'LatestVersion'
+              enabled: true
+
+            - task: AzurePowerShell@5
+              displayName: List P KV Certs
+              inputs:
+                azureSubscription: 'CMFG Production ITPortfolio'
+                ScriptType: 'InlineScript'
+                Inline: |
+                  # (Get-AzKeyVault -VaultName kv-atlas-ITPortfolio-p | Get-AzKeyVaultCertificate).name
+                  (Get-AzKeyVault -VaultName kv-atlas-ITPortfolio-p | Get-AzKeyVaultCertificate | select *)
+                azurePowerShellVersion: 'LatestVersion'
+              enabled: true

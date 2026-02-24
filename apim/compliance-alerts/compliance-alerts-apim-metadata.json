@@ -1,0 +1,32 @@
+{
+    "apis": [
+        {
+            "name": "ai-service-Plugin-Compliance-Alerts",
+            "definitionfile": "compliance-alerts-openapi.json",
+            "backend_uri": "__backend_uri__",
+            "protocol": "https",
+            "schemaFileFormat": "OpenApi",
+            "api_path": "/aiservices/compliance-alerts",
+            "ApiVersion": "v1",
+            "Description": "A plugin for web research and summarization tasks for compliance alerts: DS-GenAI-Onshore@trustage.com",
+            "policies": [
+                {
+                    "name": "jwt-policy",
+                    "path": "jwt-policy.xml"
+                }
+            ],
+            "Operations": [
+              {
+                    "Operation": "research_research_post",
+                    "name": "research-policy",
+                    "path": "research-policy.xml"
+                },
+                {
+                    "Operation": "scrape_scrape_post",
+                    "name": "scrape-policy",
+                    "path": "scrape-policy.xml"
+                }
+            ]
+        }
+    ]
+}

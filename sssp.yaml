@@ -1,0 +1,68 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  name: Release-ITPortfolio-NP
+
+variables:
+  azureServiceConnection: 'CMFG NonProduction ITPortfolio'
+  servicePrincipalName: 'SP-AI-CognitiveServices-NP'
+  keyVaultName: 'kv-d01-ai-cognitive-01'
+  resourcegroup: 'rg-cmfg-d01-psa-cognitiveservices-tf'
+
+steps:
+
+- task: deployAzureServicePrincipal@1
+  inputs:
+    ConnectedServiceNameARM: 'CMFG NonProduction ITPortfolio'
+    action: 'newSp'
+    displayName: 'SP-AI-SharePoint-D'
+    description: 'Identity will be used for AI cognitive services'
+    credentialLifetimeDays: 30
+    keyVaultName: 'kv-d01-ai-cognitive-01'
+    keyVaultResourceGroup: 'RG-CMFG-D01-PSA-CognitiveServices-TF'
+    keyVaultSubscription: 'CMFG NonProduction'
+    contactEmail: 'DS-GenAI-Onshore@trustage.com'
+    cmdbAssetTag: '000091958'
+  enabled: false
+- task: deployAzureServicePrincipal@1
+  inputs:
+    ConnectedServiceNameARM: 'CMFG NonProduction ITPortfolio'
+    action: 'newSpSecret'
+    displayName: 'SP-AI-SharePoint-D'
+    credentialLifetimeDays: 30
+    keyVaultName: 'kv-d01-ai-cognitive-tf'
+    keyVaultResourceGroup: 'RG-CMFG-D01-PSA-CognitiveServices-TF'
+    keyVaultSubscription: 'CMFG NonProduction'
+    contactEmail: 'DS-GenAI-Onshore@trustage.com'
+    cmdbAssetTag: '000091958'
+  enabled: false
+- task: AzureKeyVault@2
+  inputs:
+    azureSubscription: 'CMFG NonProduction ITPortfolio'
+    KeyVaultName: 'kv-d01-ai-cognitive-01'
+    SecretsFilter: '*'
+    RunAsPreJob: false
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: $(azureServiceConnection)
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+      $newPassword = $(openssl rand -base64 32)
+      az ad sp create-for-rbac --name $(servicePrincipalName) --role "Contributor" --scopes "/subscriptions/<subscription-id>" --years 1
+
+       # Update Service Principal with new password
+      az ad sp credential reset --name $(servicePrincipalName) --password $newPassword
+
+       # Store the new password in Azure Key Vault as a secret
+      az keyvault secret set --vault-name $(keyVaultName) --name "SP-Credentials-$(servicePrincipalName)" --value $newPassword
+
+      echo "##vso[task.setVariable variable=newPassword;isOutput=true]$newPassword"
+  name: SetSPCredential
+  enabled: false

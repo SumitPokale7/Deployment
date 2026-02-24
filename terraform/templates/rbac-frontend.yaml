@@ -1,0 +1,63 @@
+# Frontend RBAC Template
+# Configures RBAC permissions for frontend services
+
+parameters:
+- name: environment
+  type: string
+- name: serviceConnection
+  type: string
+- name: resourceGroupName
+  type: string
+- name: enabled
+  type: boolean
+  default: false
+
+jobs:
+- job: chatApp_frontendspa_RoleBasedAccessControl
+  displayName: 'Configure Frontend RBAC'
+  pool:
+    name: "Release-ITPortfolio-NP"
+  condition: eq('${{ parameters.enabled }}', 'true')
+  steps:
+    - checkout: self
+      clean: True
+      
+    - task: AzurePowerShell@5
+      displayName: "Get Resource Id's for RBAC"
+      inputs:
+        azureSubscription: '${{ parameters.serviceConnection }}'
+        ScriptType: 'InlineScript'
+        Inline: |
+          $localrgname = "${{ parameters.resourceGroupName }}"
+          
+          # Determine environment prefix
+          $environment = "${{ parameters.environment }}"
+          $envPrefix = switch ($environment.ToLower()) {
+            "prod" { "p01" }
+            "demo" { "m01" }
+            "dev"  { "d01" }
+            default { "d01" }
+          }
+          
+          # Set ACR ID based on environment
+          $acrId = if ("${{ parameters.environment }}" -eq "prod") {
+            "/subscriptions/94f0eebc-4d31-4d69-bc92-dfc97103744a/resourceGroups/rg-cmfg-p01-psa-cognitiveservices-tf/providers/Microsoft.ContainerRegistry/registries/acraiservicesprod"
+          } else {
+            "/subscriptions/059ed1ab-6824-4344-9a65-a0504248340f/resourceGroups/rg-cmfg-d01-psa-cognitiveservices-tf/providers/Microsoft.ContainerRegistry/registries/acraiservicesnonprod"
+          }
+          Write-Host "##vso[task.setvariable variable=acrId]$acrId"
+          
+          $chatAppfrontend_sami = (Get-AzContainerApp -ResourceGroupName $localrgname | Where-Object Name -eq "ca-$envPrefix-ai-chatapp-frontend-tf").IdentityPrincipalId
+          Write-Host "##vso[task.setvariable variable=chatAppfrontend_sami]$chatAppfrontend_sami"
+          write-host "$chatAppfrontend_sami"
+        azurePowerShellVersion: LatestVersion
+        
+    - task: deployAzureRbacChanges@1
+      displayName: "acrpull for chat app frontend api container app system Assigned Managed Identity"
+      inputs:
+        ConnectedServiceNameARM: '${{ parameters.serviceConnection }}'
+        resourceId: $(acrId)
+        identity: $(chatAppfrontend_sami)
+        permissionsAction: 'permissionAdd'
+        permissions: 'AcrPull'
+      enabled: true

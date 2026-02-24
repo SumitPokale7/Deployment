@@ -1,0 +1,49 @@
+trigger:
+  - none
+resources:
+  repositories:
+  - repository: self
+  - repository: AzureAPIM
+    name: Internal Open Source/AzureAPIM
+    type: git
+
+stages:
+- stage: CreateAPIMProduct
+  displayName: 'Deploy Product to Dev'
+  pool: 
+    vmImage: windows-latest
+  jobs:
+  - template: templates/create-product.yml@AzureAPIM
+    parameters:
+      ProductFileName: dev-product.json
+      ProductFolderPath: $(System.DefaultWorkingDirectory)/Deployment/apim/products/Translation_Maestro
+      APIM_Environment: Dev
+      AzureDevOps_EnvironmentName: APIM-Dev
+      AzureSubscription: CMFG NonProduction ITPortfolio
+
+- stage: CreateAPIMProductDemo
+  displayName: 'Deploy Product to Demo'
+  pool: 
+    vmImage: windows-latest
+  jobs:
+  - template: templates/create-product.yml@AzureAPIM
+    parameters:
+      ProductFileName: demo-product.json
+      ProductFolderPath: $(System.DefaultWorkingDirectory)/Deployment/apim/products/Translation_Maestro
+      APIM_Environment: Demo
+      AzureDevOps_EnvironmentName: APIM-Demo
+      AzureSubscription: CMFG NonProduction ITPortfolio
+
+- stage: CreateAPIMProductProd
+  displayName: 'Deploy Product to Prod'
+  #condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  pool: 
+    vmImage: windows-latest
+  jobs:
+  - template: templates/create-product.yml@AzureAPIM
+    parameters:
+      ProductFileName: prod-product.json
+      ProductFolderPath: $(System.DefaultWorkingDirectory)/Deployment/apim/products/Translation_Maestro
+      APIM_Environment: Prod
+      AzureDevOps_EnvironmentName: APIM-Prod
+      AzureSubscription: CMFG Production ITPortfolio

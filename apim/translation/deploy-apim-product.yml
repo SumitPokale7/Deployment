@@ -1,0 +1,60 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  - none
+
+resources:
+ repositories:
+   - repository: self
+   - repository: AzureAPIM
+     name: Internal Open Source/AzureAPIM
+     type: git
+parameters:
+  - name: target_environment
+    displayName: Environment
+    type: string
+    default: dev
+    values:
+    - dev
+    - demo
+    - prod  
+
+variables:
+   - template: ../translation/variables/${{ parameters.target_environment }}.yml
+
+#pool: 
+  #vmImage: windows-latest
+
+stages:
+#
+# Deploy API to DEV
+#
+ - template: ../../apim/commons/API_Deployment.YAML
+   parameters:
+    AzureDevOps_EnvironmentName:  $(AzureDevOps_EnvironmentName)
+    AzureSubscription: $(AzureSubscription)
+    API_Def: $(API_Def)
+    Environment: $(Environment)
+    backend_uri: $(backend_uri)
+
+ - template: ../../apim/commons/Basic_Policy_Deployment.YAML  
+   parameters:
+    AzureDevOps_EnvironmentName:  $(AzureDevOps_EnvironmentName)
+    AzureSubscription: $(AzureSubscription)
+    API_Def: $(API_Def)
+    Environment: $(Environment)
+    FolderPath: $(System.DefaultWorkingDirectory)/Deployment/apim/translation/
+    SubscriptionKey: $(SubscriptionKey)
+    RoleGroupName: $(RoleGroupName)
+    URL: $(URL)
+
+ - template: ../../apim/commons/Subscribe_Product_To_APIM.YAML  
+   parameters:
+    AzureDevOps_EnvironmentName:  $(AzureDevOps_EnvironmentName)
+    AzureSubscription: $(AzureSubscription)
+    Environment: $(Environment)
+    FolderPath: $(System.DefaultWorkingDirectory)/Deployment/apim
+    Product_def: $(Product_def)

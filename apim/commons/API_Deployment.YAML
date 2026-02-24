@@ -1,0 +1,43 @@
+parameters:
+- name: AzureDevOps_EnvironmentName
+  type: string
+- name: AzureSubscription
+  type: string
+- name: API_Def
+  type: string
+- name: Environment
+  type: string
+- name: backend_uri
+  type: string
+
+stages:
+ - stage: DeployAPI
+   displayName: 'Deploying API'
+   dependsOn:
+   pool:
+    vmImage: 'windows-latest'
+   variables:
+   - name: apis.0.backend_uri
+     value: "${{ parameters.backend_uri}}"
+   jobs:
+    - deployment: deployapi
+      displayName: 'Deploy API'
+      environment: ${{ parameters.AzureDevOps_EnvironmentName}}
+      strategy:
+        runOnce:
+         deploy:
+          steps:
+            - checkout: self
+            - checkout: AzureAPIM
+            - task: FileTransform@1
+              inputs:
+                folderPath: '$(System.DefaultWorkingDirectory)/**/'
+                fileType: 'json'
+                targetFiles: '**/${{ parameters.API_Def}}'
+            - task: AzurePowerShell@5
+              inputs:
+                azureSubscription: '${{ parameters.AzureSubscription}}'
+                ScriptType: 'FilePath'
+                ScriptPath: '$(System.DefaultWorkingDirectory)/AzureAPIM/CreateApiFromDefinitions.ps1'
+                ScriptArguments: '-FileName "${{ parameters.API_Def}}" -Environment "${{ parameters.Environment}}"'
+                azurePowerShellVersion: 'LatestVersion'
