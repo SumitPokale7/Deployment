@@ -142,7 +142,6 @@ param searchServiceName string
 param searchPrivateEndpointName string
 
 @description('Name for the search private service connection')
-#disable-next-line no-unused-params
 param searchPrivateServiceConnectionName string
 
 @description('Name of the Search private DNS zone')
@@ -197,7 +196,6 @@ param translatorSubdomainName string
 param translatorPrivateEndpointName string
 
 @description('Name for Translator private service connection')
-#disable-next-line no-unused-params
 param translatorPrivateServiceConnectionName string
 
 // ============================================================================
@@ -401,6 +399,7 @@ module search 'search.bicep' = {
     tags: tags
     searchServiceName: searchServiceName
     searchPrivateEndpointName: searchPrivateEndpointName
+    searchPrivateServiceConnectionName: searchPrivateServiceConnectionName
     searchDnsZoneName: searchPrivateDnsZoneName
     privateEndpointSubnetId: networking.outputs.privateEndpointSubnetId
     searchDnsZoneLinkName: azurermPrivateDnsZoneVirtualNetworkLinkSearch
@@ -421,7 +420,9 @@ module cognitive 'cognitive.bicep' = {
     translatorLocation: translatorLocation
     translatorSubdomainName: translatorSubdomainName
     formRecognizerPrivateEndpointName: documentPrivateEndpointName
+    formRecognizerPrivateServiceConnectionName: documentReaderServiceConnectionName
     translatorPrivateEndpointName: translatorPrivateEndpointName
+    translatorPrivateServiceConnectionName: translatorPrivateServiceConnectionName
     cognitiveServicesDnsZoneName: documentIntelligenceOpenaiPrivateDnsZoneName
     cognitiveServicesDnsZoneLinkName: azurermPrivateFrDnsZoneVirtualNetworkLink
     openAIDnsZoneName: openaiPrivateDnsZoneName

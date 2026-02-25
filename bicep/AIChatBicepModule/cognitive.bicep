@@ -40,8 +40,14 @@ param privateEndpointSubnetId string = ''
 @description('Form Recognizer private endpoint name')
 param formRecognizerPrivateEndpointName string = ''
 
+@description('Name for Form Recognizer private service connection')
+param formRecognizerPrivateServiceConnectionName string = ''
+
 @description('Translator private endpoint name')
 param translatorPrivateEndpointName string = ''
+
+@description('Name for Translator private service connection')
+param translatorPrivateServiceConnectionName string = ''
 
 @description('Cognitive Services DNS zone name')
 param cognitiveServicesDnsZoneName string = 'privatelink.cognitiveservices.azure.com'
@@ -163,6 +169,7 @@ resource openAIDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLink
     virtualNetwork: {
       id: virtualNetworkId
     }
+    resolutionPolicy: 'Default'
   }
 }
 
@@ -234,7 +241,7 @@ resource openaiPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
   properties: {
     privateLinkServiceConnections: [
       {
-        name: account.value.?private_endpoint_name ?? '${account.value.name}-pe'
+        name: account.value.?private_service_connection_name ?? '${account.value.name}-pe'
         properties: {
           privateLinkServiceId: openaiAccount[i].id
           groupIds: ['account']
@@ -280,7 +287,7 @@ resource formRecognizerPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-
   properties: {
     privateLinkServiceConnections: [
       {
-        name: formRecognizerPrivateEndpointName
+        name: formRecognizerPrivateServiceConnectionName
         properties: {
           privateLinkServiceId: formRecognizer.id
           groupIds: ['account']
@@ -306,7 +313,7 @@ resource translatorPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-0
   properties: {
     privateLinkServiceConnections: [
       {
-        name: translatorPrivateEndpointName
+        name: translatorPrivateServiceConnectionName
         properties: {
           privateLinkServiceId: translator.id
           groupIds: ['account']

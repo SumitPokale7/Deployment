@@ -126,6 +126,7 @@ resource cosmosDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLink
     virtualNetwork: {
       id: virtualNetworkId
     }
+    resolutionPolicy: 'Default'
   }
 }
 
@@ -166,7 +167,7 @@ resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneG
   properties: {
     privateDnsZoneConfigs: [
       {
-        name: 'privatelink-documents-azure-com'
+        name: 'privatelink.documents.azure.com'
         properties: {
           privateDnsZoneId: cosmosDnsZone.id
         }

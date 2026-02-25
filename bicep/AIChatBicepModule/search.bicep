@@ -36,8 +36,11 @@ param privateEndpointSubnetId string = ''
 @description('Name of the private endpoint')
 param searchPrivateEndpointName string = ''
 
+@description('Name for Search private service connection')
+param searchPrivateServiceConnectionName string = ''
+
 @description('Search private DNS zone name')
-param searchDnsZoneName string = 'privatelink.search.windows.net'
+param searchDnsZoneName string = 'privatelink-search-windows-net'
 
 @description('Virtual network ID for DNS zone link')
 param virtualNetworkId string = ''
@@ -55,9 +58,6 @@ resource searchService 'Microsoft.Search/searchServices@2024-06-01-preview' = {
   tags: tags
   sku: {
     name: searchSku
-  }
-  identity: {
-    type: 'SystemAssigned'
   }
   properties: {
     replicaCount: replicaCount
@@ -120,7 +120,7 @@ resource searchPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
   properties: {
     privateLinkServiceConnections: [
       {
-        name: searchPrivateEndpointName
+        name: searchPrivateServiceConnectionName
         properties: {
           privateLinkServiceId: searchService.id
           groupIds: ['searchService']
@@ -133,7 +133,6 @@ resource searchPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
       id: privateEndpointSubnetId
     }
     ipConfigurations: []
-    customDnsConfigs: []
   }
 }
 

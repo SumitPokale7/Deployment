@@ -56,7 +56,6 @@ param vpnIpAddresses array = [
   '208.91.239.1/32'
   '20.94.99.16/28'
   '20.80.45.128/28'
-  '172.177.156.178/32'
 ]
 
 @description('Veracode IP address')
@@ -103,6 +102,7 @@ param sslCertificateData string = ''
 param sslCertificatePassword string = ''
 
 @description('Use Key Vault for SSL certificate')
+#disable-next-line no-unused-params
 param useKeyVaultCertificate bool = false
 
 @description('Key Vault secret ID for SSL certificate')
@@ -125,8 +125,18 @@ param staticErrorPageUrl403 string = ''
 
 var derivedWafPolicyName = !empty(wafPolicyName) ? wafPolicyName : 'wafpolicy-owasp-geoblock'
 
-// Filter container apps that have AGW integration enabled
-var agwEnabledApps = filter(items(containerApps), app => app.value.?agw_enabled ?? false)
+// Filter container apps that have AGW integration enabled (unsorted)
+var agwEnabledAppsUnsorted = filter(items(containerApps), app => app.value.?agw_enabled ?? false)
+
+// Sort AGW-enabled apps by agw_index to preserve the existing Azure resource order.
+// This prevents drift caused by Bicep's items() alphabetical sort differing from
+// the order in which resources were originally created in Azure.
+// Each app in containerApps that has agw_enabled:true MUST also define agw_index (0-based).
+var agwEnabledApps = [for i in range(0, length(agwEnabledAppsUnsorted)): filter(agwEnabledAppsUnsorted, app => (app.value.?agw_index ?? 999) == i)[0]]
+
+// Separate sorted arrays for probes and pathRules — Azure stored these in different orders at deploy time
+var agwEnabledAppsForProbes = [for i in range(0, length(agwEnabledAppsUnsorted)): filter(agwEnabledAppsUnsorted, app => (app.value.?agw_probe_index ?? 999) == i)[0]]
+var agwEnabledAppsForPathRules = [for i in range(0, length(agwEnabledAppsUnsorted)): filter(agwEnabledAppsUnsorted, app => (app.value.?agw_path_index ?? 999) == i)[0]]
 
 // Filter container apps that have URL rewrite enabled
 var containerAppsWithRewrite = filter(agwEnabledApps, app => app.value.?agw_rewrite_enabled ?? false)
@@ -249,12 +259,15 @@ var sqliAndXssExclusionRuleSets = [
           { ruleId: '941280' }
           { ruleId: '941290' }
           { ruleId: '941300' }
-          { ruleId: '941310' }
-          { ruleId: '941320' }
-          { ruleId: '941330' }
-          { ruleId: '941340' }
-          { ruleId: '941350' }
-          { ruleId: '941360' }
+        ]
+      }
+      {
+        ruleGroupName: 'REQUEST-931-APPLICATION-ATTACK-RFI'
+        rules: [
+          { ruleId: '931100' }
+          { ruleId: '931110' }
+          { ruleId: '931120' }
+          { ruleId: '931130' }
         ]
       }
     ]
@@ -358,7 +371,7 @@ var investmentHttpSettings = deployInvestment ? [
 ] : []
 
 // Container Apps probes
-var containerAppProbes = [for app in agwEnabledApps: {
+var containerAppProbes = [for app in agwEnabledAppsForProbes: {
   name: '${app.key}-containerapp-health-probe'
   properties: {
     protocol: 'Https'
@@ -394,7 +407,7 @@ var investmentProbes = deployInvestment ? [
 ] : []
 
 // Container Apps path rules
-var containerAppPathRules = [for app in agwEnabledApps: {
+var containerAppPathRules = [for app in agwEnabledAppsForPathRules: {
   name: 'containerapp-${app.key}-rule'
   properties: {
     paths: app.value.?agw_path_patterns ?? ['/${app.key}/*']
@@ -773,7 +786,7 @@ resource appGateway 'Microsoft.Network/applicationGateways@2024-05-01' = {
         }
       }
     ]
-    sslCertificates: useKeyVaultCertificate && !empty(keyVaultCertificateSecretId) ? [
+    sslCertificates: !empty(keyVaultCertificateSecretId) ? [
       {
         name: 'front-end-cert'
         properties: {
@@ -832,7 +845,7 @@ resource appGateway 'Microsoft.Network/applicationGateways@2024-05-01' = {
             id: resourceId('Microsoft.Network/applicationGateways/frontendPorts', applicationGatewayName, 'frontend-port-ssl')
           }
           protocol: 'Https'
-          sslCertificate: (useKeyVaultCertificate && !empty(keyVaultCertificateSecretId)) || !empty(sslCertificateData) ? {
+          sslCertificate: !empty(keyVaultCertificateSecretId) || !empty(sslCertificateData) ? {
             id: resourceId('Microsoft.Network/applicationGateways/sslCertificates', applicationGatewayName, 'front-end-cert')
           } : null
           hostNames: []

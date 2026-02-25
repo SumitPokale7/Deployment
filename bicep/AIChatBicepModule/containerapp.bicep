@@ -155,6 +155,10 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
 // Create a container app for each entry in containerApps object
 // ============================================================================
 
+resource existingContainerApps 'Microsoft.App/containerApps@2024-03-01' existing = [for (app, i) in items(containerApps): {
+  name: app.value.name
+}]
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = [for (app, i) in items(containerApps): {
   name: app.value.name
   location: location
@@ -193,7 +197,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = [for (app, i) i
       containers: [
         {
           // Image managed by CI/CD - use placeholder for initial deployment
-          image: app.value.?image ?? 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          image: app.value.?image ?? existingContainerApps[i].properties.template.containers[0].image
           name: app.value.name
           resources: {
             cpu: contains(app.value, 'cpu') ? json(app.value.cpu) : json('0.25')

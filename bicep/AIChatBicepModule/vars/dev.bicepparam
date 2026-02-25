@@ -178,6 +178,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 10
     agw_enabled: true
+    agw_index: 0
+    agw_probe_index: 0
+    agw_path_index: 9
     agw_request_timeout: 120
     agw_path_patterns: ['/translationapi/*']
     agw_rewrite_enabled: true
@@ -453,6 +456,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 10
     agw_enabled: true
+    agw_index: 3
+    agw_probe_index: 3
+    agw_path_index: 0
     agw_path_patterns: ['/mailboxapi/*']
     agw_rewrite_enabled: true
     agw_rewrite_pattern: '/mailboxapi/(.*)'
@@ -655,6 +661,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 10
     agw_enabled: true
+    agw_index: 2
+    agw_probe_index: 8
+    agw_path_index: 3
     agw_path_patterns: ['/*']
     env: [
       {
@@ -749,6 +758,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 5
     agw_enabled: true
+    agw_index: 10
+    agw_probe_index: 5
+    agw_path_index: 1
     agw_path_patterns: ['/chatapi/*']
     env: [
       {
@@ -1127,6 +1139,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 5
     agw_enabled: true
+    agw_index: 7
+    agw_probe_index: 9
+    agw_path_index: 5
     agw_path_patterns: ['/chatkmstrainingapi/*']
     env: [
       {
@@ -1381,6 +1396,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 5
     agw_enabled: true
+    agw_index: 5
+    agw_probe_index: 7
+    agw_path_index: 6
     agw_path_patterns: ['/coreservicesapi/*']
     env: [
       {
@@ -1587,6 +1605,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 5
     agw_enabled: true
+    agw_index: 1
+    agw_probe_index: 2
+    agw_path_index: 8
     agw_path_patterns: ['/inferenceapi/*']
     env: [
       {
@@ -1869,6 +1890,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 5
     agw_enabled: true
+    agw_index: 6
+    agw_probe_index: 10
+    agw_path_index: 7
     agw_path_patterns: ['/documentingestionapi/*']
     env: [
       {
@@ -2079,6 +2103,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 5
     agw_enabled: true
+    agw_index: 9
+    agw_probe_index: 4
+    agw_path_index: 10
     agw_path_patterns: ['/translatorservice/*']
   }
   chat_app_frontend_v3: {
@@ -2095,6 +2122,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 10
     agw_enabled: true
+    agw_index: 4
+    agw_probe_index: 1
+    agw_path_index: 4
     agw_path_patterns: ['/pilot', '/pilot/*']
     env: [
       {
@@ -2177,6 +2207,9 @@ param containerApps = {
     max_replicas: 3
     max_inactive_revisions: 5
     agw_enabled: true
+    agw_index: 8
+    agw_probe_index: 6
+    agw_path_index: 2
     agw_path_patterns: ['/pilotapi/*']
     env: [
       {

@@ -160,6 +160,17 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-07-01' = {
     addressSpace: {
       addressPrefixes: vnetAddressSpace
     }
+    // flowLogConfiguration: {
+    //   enabledFlowLogCategories: 3882
+    //   forceFlowLogConfig: false
+    // }
+    // privateEndpointVNetPolicies: 'Disabled'
+    // serviceEndpoints: [
+    //   {
+    //     service: 'Microsoft.CognitiveServices'
+    //   }
+    // ]
+    // defaultOutboundAccess: true
   }
 }
 
@@ -177,6 +188,17 @@ resource agwafSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-07-01' = {
     }
     privateEndpointNetworkPolicies: 'Disabled'
     privateLinkServiceNetworkPolicies: 'Enabled'
+    defaultOutboundAccess: true
+    serviceEndpoints: [
+      {
+        service: 'Microsoft.CognitiveServices'
+      }
+    ]
+    //  applicationGatewayIPConfigurations: [
+    //   {
+    //     id: '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.Network/applicationGateways/${agwafName}/ipConfigurations/appGatewayIpConfig'
+    //   }
+    // ]
   }
 }
 
@@ -190,6 +212,12 @@ resource privateEndpointSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-0
     }
     privateEndpointNetworkPolicies: 'Enabled'
     privateLinkServiceNetworkPolicies: 'Enabled'
+    serviceEndpoints: [
+      {
+        service: 'Microsoft.CognitiveServices'
+      }
+    ]
+    defaultOutboundAccess: true
   }
   dependsOn: [
     agwafSubnet
@@ -211,6 +239,12 @@ resource containerAppSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-07-0
         }
       }
     ]
+    serviceEndpoints: [
+      {
+        service: 'Microsoft.CognitiveServices'
+      }
+    ]
+    defaultOutboundAccess: true
   }
   dependsOn: [
     privateEndpointSubnet
