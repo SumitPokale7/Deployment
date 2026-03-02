@@ -131,6 +131,9 @@ param cosmosOpenaiPrivateDnsZoneName string
 @description('Name of the Cosmos DB DNS zone virtual network link')
 param azurermPrivateDnsZoneVirtualNetworkLinkCosmos string
 
+@description('Name of the Cosmos DB network interface')
+param cosmosDbNetworkInterfaceName string
+
 // ============================================================================
 // Search Parameters
 // ============================================================================
@@ -149,6 +152,9 @@ param searchPrivateDnsZoneName string
 
 @description('Name for the Search DNS zone virtual network link')
 param azurermPrivateDnsZoneVirtualNetworkLinkSearch string
+
+@description('Name of the Search network interface')
+param searchNetworkInterfaceName string
 
 // ============================================================================
 // Cognitive Services - Form Recognizer Parameters
@@ -179,6 +185,9 @@ param azurermPrivateFrDnsZoneVirtualNetworkLink string
 @description('Quota for embedding model')
 param embeddingQuota string
 
+@description('Name of the Form Recognizer network interface')
+param formRecognizerNetworkInterfaceName string
+
 // ============================================================================
 // Cognitive Services - Translator Parameters
 // ============================================================================
@@ -197,6 +206,9 @@ param translatorPrivateEndpointName string
 
 @description('Name for Translator private service connection')
 param translatorPrivateServiceConnectionName string
+
+@description('Name of the Translator network interface')
+param translatorNetworkInterfaceName string
 
 // ============================================================================
 // Cognitive Services - OpenAI Parameters
@@ -266,15 +278,15 @@ param acaEnvName string
 param acaInfrastructureResourceGroupName string
 
 @description('Name of the Container App Environment private endpoint')
-#disable-next-line no-unused-params
 param acaEnvPrivateEndpointName string
 
 @description('Name for the Container Apps private endpoint connection')
-#disable-next-line no-unused-params
 param acaPrivateEndpointConnectionName string
 
+@description('Name for the Container Network Interface')
+param acaNetworkInterfaceName string
+
 @description('Name for the Container Apps DNS zone virtual network link')
-#disable-next-line no-unused-params
 param acaPrivateDnsZoneVirtualNetworkLinkName string
 
 @description('Container apps configuration')
@@ -334,6 +346,7 @@ module networking 'networking.bicep' = {
     tags: tags
     vnetName: vnetName
     agwafNsgName: agwafNsgName
+    agwafName: agwafName
     privateEndpointNsgName: privateEndpointNsgName
     privateEndpointSubnetName: privateEndpointSubnetName
     containerAppSubnetName: acaSubnetName
@@ -349,6 +362,7 @@ module monitoring 'monitoring.bicep' = {
     tags: tags
     applicationInsightsName: aisName
     logAnalyticsWorkspaceName: acaLogAnalyticsWorkspaceName
+    applicationGatewayName: agwafName
   }
 }
 
@@ -386,6 +400,7 @@ module cosmos 'cosmos.bicep' = {
     cosmosDbPrivateEndpointName: cosmosdbEndpointName
     cosmosDbDnsZoneLinkName: azurermPrivateDnsZoneVirtualNetworkLinkCosmos
     cosmosDbDnsZoneName: cosmosOpenaiPrivateDnsZoneName
+    cosmosDbNetworkInterfaceName: cosmosDbNetworkInterfaceName
     privateEndpointSubnetId: networking.outputs.privateEndpointSubnetId
     virtualNetworkId: networking.outputs.vnetId
   }
@@ -400,9 +415,10 @@ module search 'search.bicep' = {
     searchServiceName: searchServiceName
     searchPrivateEndpointName: searchPrivateEndpointName
     searchPrivateServiceConnectionName: searchPrivateServiceConnectionName
+    searchDnsZoneLinkName: azurermPrivateDnsZoneVirtualNetworkLinkSearch
+    searchNetworkInterfaceName: searchNetworkInterfaceName
     searchDnsZoneName: searchPrivateDnsZoneName
     privateEndpointSubnetId: networking.outputs.privateEndpointSubnetId
-    searchDnsZoneLinkName: azurermPrivateDnsZoneVirtualNetworkLinkSearch
     virtualNetworkId: networking.outputs.vnetId
   }
 }
@@ -416,15 +432,18 @@ module cognitive 'cognitive.bicep' = {
     formRecognizerName: formRecognizerName
     formRecognizerLocation: formRecognizerLocation
     formRecognizerSubdomainName: formRecognizerSubdomainName
+    formRecognizerNetworkInterfaceName: formRecognizerNetworkInterfaceName
     translatorName: translatorName
     translatorLocation: translatorLocation
     translatorSubdomainName: translatorSubdomainName
+    translatorNetworkInterfaceName: translatorNetworkInterfaceName
     formRecognizerPrivateEndpointName: documentPrivateEndpointName
     formRecognizerPrivateServiceConnectionName: documentReaderServiceConnectionName
     translatorPrivateEndpointName: translatorPrivateEndpointName
     translatorPrivateServiceConnectionName: translatorPrivateServiceConnectionName
     cognitiveServicesDnsZoneName: documentIntelligenceOpenaiPrivateDnsZoneName
     cognitiveServicesDnsZoneLinkName: azurermPrivateFrDnsZoneVirtualNetworkLink
+    azurermPrivateDnsZoneVirtualNetworkLinkSearch: azurermPrivateDnsZoneVirtualNetworkLinkSearch
     openAIDnsZoneName: openaiPrivateDnsZoneName
     openAIDnsZoneLinkName: azurermPrivateDnsZoneVirtualNetworkLinkOpenai
     privateEndpointSubnetId: networking.outputs.privateEndpointSubnetId
@@ -448,9 +467,11 @@ module containerapp 'containerapp.bicep' = {
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
     logAnalyticsCustomerId: monitoring.outputs.logAnalyticsCustomerId
     infrastructureResourceGroupName: acaInfrastructureResourceGroupName
-    containerAppsDnsZoneLinkName: acaPrivateDnsZoneVirtualNetworkLinkName
     containerAppEnvPrivateEndpointName: acaEnvPrivateEndpointName
+    containerAppEnvNetworkInterfaceName: acaNetworkInterfaceName
+    containerAppEnvPrivateEndpointConnectionName: acaPrivateEndpointConnectionName
     privateEndpointSubnetId: networking.outputs.privateEndpointSubnetId
+    containerAppsDnsZoneLinkName: acaPrivateDnsZoneVirtualNetworkLinkName
     virtualNetworkId: networking.outputs.vnetId
     containerApps: containerApps
   }
@@ -479,14 +500,6 @@ module agwaf 'agwaf.bicep' = {
     investmentStorageName: investmentStorageName
     // Static error page
     staticErrorPageUrl403: staticErrorPageUrl403
-  }
-}
-
-// 11. Coco Cognitive Services Module
-module cocoCognitive './coco-cognitive.bicep' = {
-  name: 'coco-cognitive-module'
-  params: {
-    environment: environment
   }
 }
 

@@ -28,9 +28,11 @@ param deployAcr bool = true
 param containerAppEnvName string
 
 @description('Log Analytics Workspace ID')
+#disable-next-line no-unused-params
 param logAnalyticsWorkspaceId string
 
 @description('Log Analytics Customer ID')
+#disable-next-line no-unused-params
 param logAnalyticsCustomerId string
 
 @description('Infrastructure subnet ID for Container App Environment')
@@ -53,11 +55,15 @@ param workloadProfileType string = 'Consumption'
 param infrastructureResourceGroupName string = ''
 
 @description('Private endpoint name for Container App Environment')
-#disable-next-line no-unused-params
 param containerAppEnvPrivateEndpointName string = ''
 
+@description('Network interface name for Container App Environment private endpoint')
+param containerAppEnvNetworkInterfaceName string = ''
+
+@description('Private endpoint connection name for Container App Environment')
+param containerAppEnvPrivateEndpointConnectionName string = ''
+
 @description('Subnet ID for private endpoint')
-#disable-next-line no-unused-params
 param privateEndpointSubnetId string = ''
 
 @description('Container Apps private DNS zone virtual network link name')
@@ -121,9 +127,14 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
-        customerId: logAnalyticsCustomerId
-        sharedKey: listKeys(logAnalyticsWorkspaceId, '2023-09-01').primarySharedKey
+        customerId: '41399b6d-90aa-4d83-800c-8b892a63dd19'
       }
+    }
+    peerAuthentication: {
+      mtls: { enabled: false }
+    }
+    peerTrafficConfiguration: {
+      encryption: { enabled: false }
     }
     vnetConfiguration: {
       infrastructureSubnetId: containerAppSubnetId
@@ -137,16 +148,78 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
         workloadProfileType: workloadProfileType
       }
     ]
-    peerAuthentication: {
-      mtls: {
-        enabled: false
+  }
+}
+
+// ============================================================================
+// Private Endpoints for Cogntive Services (general)
+// ============================================================================
+
+resource privateEndpoints 'Microsoft.Network/privateEndpoints@2024-07-01' = {
+  name: containerAppEnvPrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    privateLinkServiceConnections: [
+      {
+        name: containerAppEnvPrivateEndpointConnectionName
+        properties: {
+          privateLinkServiceId: containerAppEnvironment.id
+          groupIds: [
+            'managedEnvironments'
+          ]
+        }
       }
+    ]
+    manualPrivateLinkServiceConnections: []
+    subnet: {
+      id: privateEndpointSubnetId
     }
-    peerTrafficConfiguration: {
-      encryption: {
-        enabled: false
+  }
+}
+resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
+  name: containerAppEnvNetworkInterfaceName
+  location: location
+  tags: tags
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'privateEndpointIpConfig.43eaa636-8124-49c4-9b0c-4e7024357e32'
+        properties: {
+          privateIPAddress: '10.0.3.13'
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: privateEndpointSubnetId
+          }
+          privateIPAddressVersion: 'IPv4'
+        }
       }
+    ]
+    dnsSettings: {
+      dnsServers: []
     }
+    enableAcceleratedNetworking: false
+    enableIPForwarding: false
+    disableTcpStateTracking: false
+    nicType: 'Standard'
+    auxiliaryMode: 'None'
+    auxiliarySku: 'None'
+  }
+}
+
+// ============================================================================
+// Managed Identity
+// ============================================================================
+resource userAssignedIdentities 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'MI-APIM-ai-cognitive-NP'
+  location: 'eastus'
+  tags: union(tags, {
+    AtlasPurpose: 'Atlas-MSI-Generic'
+    TemplateVersion: 'Non-Atlas deployment using Atlas artifacts-2.1.70'
+    createdOn: '2024-11-05'
+  })
+  properties: {
+    isolationScope: 'None'
   }
 }
 
@@ -155,110 +228,90 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
 // Create a container app for each entry in containerApps object
 // ============================================================================
 
-resource existingContainerApps 'Microsoft.App/containerApps@2024-03-01' existing = [for (app, i) in items(containerApps): {
-  name: app.value.name
-}]
-
-resource containerApp 'Microsoft.App/containerApps@2024-03-01' = [for (app, i) in items(containerApps): {
-  name: app.value.name
-  location: location
-  tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    managedEnvironmentId: containerAppEnvironment.id
-    environmentId: containerAppEnvironment.id
-    configuration: {
-      secrets: []
-      activeRevisionsMode: app.value.?revision_mode ?? 'Single'
-      ingress: {
-        external: true
-        targetPort: app.value.?target_port ?? 80
-        exposedPort: 0
-        transport: 'auto'
-        traffic: [
+resource containerApp 'Microsoft.App/containerApps@2024-03-01' = [
+  for (app, i) in items(containerApps): {
+    name: app.value.name
+    location: location
+    tags: tags
+    identity: {
+      type: 'SystemAssigned'
+    }
+    properties: {
+      managedEnvironmentId: containerAppEnvironment.id
+      environmentId: containerAppEnvironment.id
+      configuration: {
+        secrets: []
+        activeRevisionsMode: app.value.?revision_mode ?? 'Single'
+        ingress: {
+          external: true
+          targetPort: app.value.?target_port ?? 80
+          exposedPort: 0
+          transport: 'auto'
+          traffic: [
+            {
+              weight: 100
+              latestRevision: true
+            }
+          ]
+          allowInsecure: false
+        }
+        registries: deployAcr
+          ? [
+              {
+                server: '${acrName}.azurecr.io'
+                identity: 'system-environment'
+              }
+            ]
+          : []
+        maxInactiveRevisions: app.value.?max_inactive_revisions ?? 100
+      }
+      template: {
+        containers: [
           {
-            weight: 100
-            latestRevision: true
+            // Image managed by CI/CD - use placeholder for initial deployment
+            image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+            name: app.value.name
+            resources: {
+              cpu: contains(app.value, 'cpu') ? json(app.value.cpu) : json('0.25')
+              memory: app.value.?memory ?? '0.5Gi'
+            }
+            probes: contains(app.value, 'liveness_probe_path')
+              ? [
+                  {
+                    type: 'Liveness'
+                    httpGet: {
+                      path: app.value.liveness_probe_path
+                      port: app.value.?liveness_probe_port ?? app.value.target_port
+                    }
+                    initialDelaySeconds: 10
+                    periodSeconds: 30
+                    failureThreshold: 3
+                  }
+                ]
+              : []
+            env: []
           }
         ]
-        allowInsecure: false
-      }
-      registries: (deployAcr && (app.value.?use_acr ?? true)) ? [
-        {
-          server: '${acrName}.azurecr.io'
-          identity: 'system-environment'
+        scale: {
+          minReplicas: app.value.?min_replicas ?? 0
+          maxReplicas: app.value.?max_replicas ?? 10
+          rules: [
+            {
+              http: {
+                metadata: {
+                  concurrentRequests: '100'
+                }
+              }
+              name: 'http'
+            }
+          ]
+          
         }
-      ] : []
-      maxInactiveRevisions: app.value.?max_inactive_revisions ?? 100
-    }
-    template: {
-      containers: [
-        {
-          // Image managed by CI/CD - use placeholder for initial deployment
-          image: app.value.?image ?? existingContainerApps[i].properties.template.containers[0].image
-          name: app.value.name
-          resources: {
-            cpu: contains(app.value, 'cpu') ? json(app.value.cpu) : json('0.25')
-            memory: app.value.?memory ?? '0.5Gi'
-          }
-          probes: contains(app.value, 'liveness_probe_path') ? [
-            {
-              type: 'Liveness'
-              httpGet: {
-                path: app.value.liveness_probe_path
-                port: app.value.?liveness_probe_port ?? app.value.?target_port ?? 8001
-                scheme: 'HTTP'
-              }
-              initialDelaySeconds: 1
-              periodSeconds: 10
-              failureThreshold: 2
-              timeoutSeconds: 1
-            }
-            {
-              type: 'Readiness'
-              tcpSocket: {
-                port: app.value.?target_port ?? 8001
-              }
-              failureThreshold: 48
-              periodSeconds: 5
-              successThreshold: 1
-              timeoutSeconds: 5
-            }
-            {
-              type: 'Startup'
-              tcpSocket: {
-                port: app.value.?target_port ?? 8001
-              }
-              initialDelaySeconds: 1
-              periodSeconds: 1
-              failureThreshold: 240
-              successThreshold: 1
-              timeoutSeconds: 3
-            }
-          ] : []
-          env: app.value.?env ?? []
-        }
-      ]
-      scale: {
-        minReplicas: app.value.?min_replicas ?? 0
-        maxReplicas: app.value.?max_replicas ?? 10
-        rules: [
-          {
-            name: 'http'
-             http: {
-              metadata: {
-                concurrentRequests: '100'
-              }
-            }
-          }
-        ]
       }
+      workloadProfileName: 'Consumption'
     }
-    workloadProfileName: 'Consumption'
   }
-}]
+]
 
 // ============================================================================
 // Outputs
@@ -276,5 +329,9 @@ output containerAppEnvStaticIp string = containerAppEnvironment.properties.stati
 
 output containerAppIds array = [for (app, i) in items(containerApps): containerApp[i].id]
 output containerAppNames array = [for (app, i) in items(containerApps): containerApp[i].name]
-output containerAppFqdns array = [for (app, i) in items(containerApps): containerApp[i].properties.configuration.ingress != null ? containerApp[i].properties.configuration.ingress.fqdn : '']
+output containerAppFqdns array = [
+  for (app, i) in items(containerApps): containerApp[i].properties.configuration.ingress != null
+    ? containerApp[i].properties.configuration.ingress.fqdn
+    : ''
+]
 output containerAppPrincipalIds array = [for (app, i) in items(containerApps): containerApp[i].identity.principalId]

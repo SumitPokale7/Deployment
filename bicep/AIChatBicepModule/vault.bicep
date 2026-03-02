@@ -22,12 +22,6 @@ param enableRbacAuthorization bool = true
 @description('Enable soft delete')
 param enableSoftDelete bool = true
 
-@description('Enable purge protection')
-param enablePurgeProtection bool = true
-
-@description('Soft delete retention in days')
-param softDeleteRetentionInDays int = 90
-
 @description('Public network access setting')
 @allowed(['Enabled', 'Disabled'])
 param publicNetworkAccess string = 'Enabled'
@@ -51,18 +45,272 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
     enabledForDiskEncryption: false
     enabledForTemplateDeployment: false
     enableSoftDelete: enableSoftDelete
-    softDeleteRetentionInDays: softDeleteRetentionInDays
     enableRbacAuthorization: enableRbacAuthorization
-    enablePurgeProtection: enablePurgeProtection ? true : null
     publicNetworkAccess: publicNetworkAccess
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Allow'
-      ipRules: []
-      virtualNetworkRules: []
-    }
   }
 }
+
+resource vaults_kv_d01_ai_cognitive_01 'Microsoft.KeyVault/vaults@2024-12-01-preview' = {
+  name: 'kv-d01-ai-cognitive-01'
+  location: 'eastus2'
+  tags: union(tags, {
+    AtlasPurpose: 'Atlas-KeyVault-Generic'
+    TemplateVersion: 'Non-Atlas deployment using Atlas artifacts-2.1.70'
+    createdOn: '2024-11-05'
+  })
+  properties: {
+    sku: {
+      family: 'A'
+      name: 'premium'
+    }
+    tenantId: tenantId
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Deny'
+      ipRules: [
+        {
+          value: '208.91.239.10/32'
+        }
+        {
+          value: '208.91.239.11/32'
+        }
+        {
+          value: '208.91.239.30/32'
+        }
+        {
+          value: '208.91.237.161/32'
+        }
+        {
+          value: '208.91.237.162/32'
+        }
+        {
+          value: '208.91.237.190/32'
+        }
+        {
+          value: '8.36.116.204/32'
+        }
+        {
+          value: '40.70.130.19/32'
+        }
+        {
+          value: '52.179.197.140/32'
+        }
+        {
+          value: '20.80.45.128/28'
+        }
+        {
+          value: '20.94.99.16/28'
+        }
+      ]
+    }
+      accessPolicies: [
+      {
+        tenantId: 'a00452fd-8469-409e-91a8-bb7a008e2da0'
+        objectId: '394cd05b-9c01-4a9b-abfe-e9ba1d1533bf'
+        permissions: {
+          keys: [
+            'Decrypt'
+            'Encrypt'
+            'UnwrapKey'
+            'WrapKey'
+            'Verify'
+            'Sign'
+            'Get'
+            'List'
+            'Update'
+            'Create'
+            'Import'
+            'Delete'
+            'Backup'
+            'Restore'
+            'Recover'
+          ]
+          secrets: [
+            'Get'
+            'List'
+            'Set'
+            'Delete'
+            'Backup'
+            'Restore'
+            'Recover'
+          ]
+          certificates: [
+            'Get'
+            'List'
+            'Delete'
+            'Create'
+            'Import'
+            'Update'
+            'ManageContacts'
+            'GetIssuers'
+            'ListIssuers'
+            'SetIssuers'
+            'DeleteIssuers'
+            'ManageIssuers'
+            'Recover'
+            'Backup'
+            'Restore'
+          ]
+          storage: [
+            'get'
+            'list'
+            'delete'
+            'set'
+            'update'
+            'regeneratekey'
+            'getsas'
+            'listsas'
+            'deletesas'
+            'setsas'
+          ]
+        }
+      }
+      {
+        tenantId: 'a00452fd-8469-409e-91a8-bb7a008e2da0'
+        objectId: '4087210c-fdf5-4514-bcdc-17c1b7507890'
+        permissions: {
+          keys: [
+            'Create'
+            'Update'
+            'Delete'
+            'List'
+          ]
+          secrets: [
+            'Set'
+            'Delete'
+            'List'
+          ]
+          certificates: [
+            'Create'
+            'Update'
+            'ManageContacts'
+            'ManageIssuers'
+            'SetIssuers'
+            'Delete'
+            'List'
+          ]
+          storage: []
+        }
+      }
+      {
+        tenantId: 'a00452fd-8469-409e-91a8-bb7a008e2da0'
+        objectId: '2060ad6a-9d17-4f83-8861-b8e3ef97b9be'
+        permissions: {
+          keys: [
+            'Get'
+            'List'
+            'Update'
+            'Create'
+            'Delete'
+            'Sign'
+            'Verify'
+            'Decrypt'
+            'Encrypt'
+          ]
+          secrets: [
+            'Get'
+            'List'
+            'Set'
+            'Delete'
+          ]
+          certificates: [
+            'Get'
+            'List'
+            'Update'
+            'Create'
+            'Delete'
+            'Import'
+          ]
+          storage: []
+        }
+      }
+      {
+        tenantId: 'a00452fd-8469-409e-91a8-bb7a008e2da0'
+        objectId: '7a0998de-04b8-4948-9e22-9d53db07472e'
+        permissions: {
+          keys: [
+            'Get'
+            'List'
+            'Update'
+            'Create'
+            'Delete'
+            'Sign'
+            'Verify'
+            'Decrypt'
+            'Encrypt'
+          ]
+          secrets: [
+            'Get'
+            'List'
+            'Set'
+            'Delete'
+          ]
+          certificates: [
+            'Get'
+            'List'
+            'Update'
+            'Create'
+            'Delete'
+            'Import'
+          ]
+          storage: []
+        }
+      }
+      {
+        tenantId: 'a00452fd-8469-409e-91a8-bb7a008e2da0'
+        objectId: 'c5a1f449-bedd-452d-b4ea-ecc0495827a3'
+        permissions: {
+          keys: [
+            'Get'
+            'List'
+            'Update'
+            'Create'
+            'Delete'
+            'Sign'
+            'Verify'
+            'Decrypt'
+            'Encrypt'
+          ]
+          secrets: [
+            'Get'
+            'List'
+            'Set'
+            'Delete'
+          ]
+          certificates: [
+            'Get'
+            'List'
+            'Update'
+            'Create'
+            'Delete'
+            'Import'
+          ]
+          storage: []
+        }
+      }
+      {
+        tenantId: 'a00452fd-8469-409e-91a8-bb7a008e2da0'
+        objectId: 'a4daebb6-0119-455f-a92a-1013c76edefc'
+        permissions: {
+          certificates: []
+          keys: []
+          secrets: [
+            'get'
+            'list'
+          ]
+        }
+      }
+    ]
+    enabledForDeployment: true
+    enabledForDiskEncryption: true
+    enabledForTemplateDeployment: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 90
+    enableRbacAuthorization: false
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
 
 // ============================================================================
 // Outputs

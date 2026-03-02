@@ -31,6 +31,9 @@ param translatorLocation string = 'centralus'
 @description('Custom subdomain for Translator')
 param translatorSubdomainName string
 
+@description('translator network interface name')
+param translatorNetworkInterfaceName string = ''
+
 @description('Enable private endpoint for OpenAI')
 param enablePrivateEndpoint bool = true
 
@@ -42,6 +45,9 @@ param formRecognizerPrivateEndpointName string = ''
 
 @description('Name for Form Recognizer private service connection')
 param formRecognizerPrivateServiceConnectionName string = ''
+
+@description('form recognizer network interface name')
+param formRecognizerNetworkInterfaceName string = ''
 
 @description('Translator private endpoint name')
 param translatorPrivateEndpointName string = ''
@@ -55,9 +61,12 @@ param cognitiveServicesDnsZoneName string = 'privatelink.cognitiveservices.azure
 @description('Virtual network ID for DNS zone link')
 param virtualNetworkId string = ''
 
-
 @description('Cognitive Services DNS zone virtual network link name')
+#disable-next-line no-unused-params
 param cognitiveServicesDnsZoneLinkName string = ''
+
+@description('Additional Cognitive Services DNS zone virtual network link name (for search service)')
+param cognitiveServicesDnsZoneVNetLinkSsvcName string = ''
 
 @description('OpenAI DNS zone name')
 param openAIDnsZoneName string = 'privatelink.openai.azure.com'
@@ -68,6 +77,9 @@ param openAIDnsZoneLinkName string = ''
 @description('Embedding quota (used in deployments)')
 #disable-next-line no-unused-params
 param embeddingQuota string = '175'
+
+@description('Virtual network link name for Cognitive Services DNS zone (search service)')
+param azurermPrivateDnsZoneVirtualNetworkLinkSearch string
 
 // ============================================================================
 // Form Recognizer (Document Intelligence)
@@ -82,12 +94,14 @@ resource formRecognizer 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     name: 'S0'
   }
   identity: {
-    type: 'SystemAssigned'
+    type: 'None'
   }
   properties: {
     customSubDomainName: formRecognizerSubdomainName
     publicNetworkAccess: enablePrivateEndpoint ? 'Disabled' : 'Enabled'
     disableLocalAuth: false
+    dynamicThrottlingEnabled: false
+    restrictOutboundNetworkAccess: false
   }
 }
 
@@ -134,7 +148,21 @@ resource cognitiveServicesDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01'
 
 resource cognitiveServicesDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (enablePrivateEndpoint && !empty(virtualNetworkId)) {
   parent: cognitiveServicesDnsZone
-  name: cognitiveServicesDnsZoneLinkName
+  name: azurermPrivateDnsZoneVirtualNetworkLinkSearch
+  location: 'global'
+  tags: tags
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: virtualNetworkId
+    }
+  }
+}
+
+// Additional VNet link for Cognitive Services DNS zone (search service)
+resource cognitiveServicesDnsZoneVNetLinkSsvc 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (enablePrivateEndpoint && !empty(virtualNetworkId) && !empty(cognitiveServicesDnsZoneVNetLinkSsvcName)) {
+  parent: cognitiveServicesDnsZone
+  name: cognitiveServicesDnsZoneVNetLinkSsvcName
   location: 'global'
   tags: tags
   properties: {
@@ -224,6 +252,7 @@ resource openaiDeployments 'Microsoft.CognitiveServices/accounts/deployments@202
     model: {
       format: 'OpenAI'
       name: model.value.model_name
+      version: model.value.?model_version
     }
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
     currentCapacity: model.value.capacity
@@ -254,6 +283,37 @@ resource openaiPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
       id: privateEndpointSubnetId
     }
     ipConfigurations: []
+  }
+}]
+
+
+resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = [for (account, i) in items(openaiAccounts): if (enablePrivateEndpoint && !empty(privateEndpointSubnetId)) {
+  name: account.value.?network_interface_name ?? '${account.value.name}-pe-nic'
+  location: location
+  tags: tags
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'privateEndpointIpConfig.f150ca74-ff66-46d7-bc91-42887dd39571'
+        properties: {
+          privateIPAddress: '10.0.3.15'
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: privateEndpointSubnetId
+          }
+          privateIPAddressVersion: 'IPv4'
+        }
+      }
+    ]
+    dnsSettings: {
+      dnsServers: []
+    }
+    enableAcceleratedNetworking: false
+    enableIPForwarding: false
+    disableTcpStateTracking: false
+    nicType: 'Standard'
+    auxiliaryMode: 'None'
+    auxiliarySku: 'None'
   }
 }]
 
@@ -302,6 +362,38 @@ resource formRecognizerPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-
   }
 }
 
+
+resource CognitivenetworkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
+  name: formRecognizerNetworkInterfaceName
+  location: location
+  tags: tags
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'privateEndpointIpConfig.8186a415-d8db-49ac-9dc2-c284c7bd89e9'
+        properties: {
+          privateIPAddress: '10.0.3.11'
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: privateEndpointSubnetId
+          }
+          privateIPAddressVersion: 'IPv4'
+        }
+      }
+    ]
+    dnsSettings: {
+      dnsServers: []
+    }
+    enableAcceleratedNetworking: false
+    enableIPForwarding: false
+    disableTcpStateTracking: false
+    nicType: 'Standard'
+    auxiliaryMode: 'None'
+    auxiliarySku: 'None'
+  }
+}
+
+
 // ============================================================================
 // Private Endpoint for Translator
 // ============================================================================
@@ -324,6 +416,62 @@ resource translatorPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-0
     manualPrivateLinkServiceConnections: []
     subnet: {
       id: privateEndpointSubnetId
+    }
+  }
+}
+
+
+resource CognitiveenetworkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
+  name: translatorNetworkInterfaceName
+  location: location
+  tags: tags
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'privateEndpointIpConfig.4e1a693f-b8d8-47a9-99f1-b771b9a0b42d'
+        properties: {
+          privateIPAddress: '10.0.3.14'
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: privateEndpointSubnetId
+          }
+          privateIPAddressVersion: 'IPv4'
+        }
+      }
+    ]
+    dnsSettings: {
+      dnsServers: []
+    }
+    enableAcceleratedNetworking: false
+    enableIPForwarding: false
+    disableTcpStateTracking: false
+    nicType: 'Standard'
+    auxiliaryMode: 'None'
+    auxiliarySku: 'None'
+  }
+}
+
+// ===========================================================================
+// Private DNS Zone Groups
+// ===========================================================================
+
+resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = {
+  name: 'privatelink.centralus.azurecontainerapps.io'
+  location: 'global'
+  tags: tags
+  properties: {}
+}
+
+resource privateDnsZonesLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
+  parent: privateDnsZones
+  name: 'pdnslink-d01-ai-cognitive-aca-tf'
+  location: 'global'
+  tags: tags
+  properties: {
+    registrationEnabled: false
+    resolutionPolicy: 'Default'
+    virtualNetwork: {
+      id: virtualNetworkId
     }
   }
 }

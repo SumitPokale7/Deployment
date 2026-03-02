@@ -45,6 +45,9 @@ param containerAppSubnetAddressPrefix string = '10.0.8.0/23'
 @description('Name of the Application Gateway WAF NSG')
 param agwafNsgName string
 
+@description('Name of the Application Gateway WAF')
+param agwafName string
+
 @description('Name of the Private Endpoint NSG')
 param privateEndpointNsgName string
 
@@ -160,17 +163,35 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-07-01' = {
     addressSpace: {
       addressPrefixes: vnetAddressSpace
     }
-    // flowLogConfiguration: {
-    //   enabledFlowLogCategories: 3882
-    //   forceFlowLogConfig: false
-    // }
-    // privateEndpointVNetPolicies: 'Disabled'
-    // serviceEndpoints: [
-    //   {
-    //     service: 'Microsoft.CognitiveServices'
-    //   }
-    // ]
-    // defaultOutboundAccess: true
+    privateEndpointVNetPolicies: 'Disabled'
+    subnets: [
+      {
+        name: 'default'
+        properties: {
+          addressPrefix: '10.0.10.0/29'
+          serviceEndpoints: [
+            {
+              service: 'Microsoft.CognitiveServices'
+              locations: [
+                '*'
+              ]
+            }
+          ]
+          delegations: [
+            {
+              name: 'Microsoft.Network/applicationGateways'
+              properties: {
+                serviceName: 'Microsoft.Network/applicationGateways'
+              }
+            }
+          ]
+          privateEndpointNetworkPolicies: 'Disabled'
+          privateLinkServiceNetworkPolicies: 'Enabled'
+        }
+      }
+    ]
+    virtualNetworkPeerings: []
+    enableDdosProtection: false
   }
 }
 
@@ -194,11 +215,11 @@ resource agwafSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-07-01' = {
         service: 'Microsoft.CognitiveServices'
       }
     ]
-    //  applicationGatewayIPConfigurations: [
-    //   {
-    //     id: '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.Network/applicationGateways/${agwafName}/ipConfigurations/appGatewayIpConfig'
-    //   }
-    // ]
+     applicationGatewayIPConfigurations: [
+      {
+        id: '/subscriptions/${subscription().subscriptionId}/resourceGroups/rg-cmfg-d01-psa-cognitiveservices-tf/providers/Microsoft.Network/applicationGateways/${agwafName}/gatewayIPConfigurations/agwaf-gateway-ip-config'
+      }
+    ]
   }
 }
 
@@ -217,7 +238,7 @@ resource privateEndpointSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-0
         service: 'Microsoft.CognitiveServices'
       }
     ]
-    defaultOutboundAccess: true
+    // defaultOutboundAccess: true
   }
   dependsOn: [
     agwafSubnet

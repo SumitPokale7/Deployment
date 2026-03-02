@@ -40,13 +40,19 @@ param searchPrivateEndpointName string = ''
 param searchPrivateServiceConnectionName string = ''
 
 @description('Search private DNS zone name')
-param searchDnsZoneName string = 'privatelink-search-windows-net'
+#disable-next-line no-unused-params
+param searchDnsZoneName string = 'privatelink.search.windows.net'
 
 @description('Virtual network ID for DNS zone link')
+#disable-next-line no-unused-params
 param virtualNetworkId string = ''
 
 @description('Name for DNS zone virtual network link')
+#disable-next-line no-unused-params 
 param searchDnsZoneLinkName string = ''
+
+@description('Name of the Search network interface')
+param searchNetworkInterfaceName string
 
 // ============================================================================
 // Azure AI Search Service
@@ -95,13 +101,13 @@ resource searchDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = if (enab
 // ============================================================================
 // DNS Zone Virtual Network Link
 // ============================================================================
-
 resource searchDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (enablePrivateEndpoint && !empty(virtualNetworkId)) {
   parent: searchDnsZone
   name: searchDnsZoneLinkName
   location: 'global'
   tags: tags
   properties: {
+    resolutionPolicy: 'Default'
     registrationEnabled: false
     virtualNetwork: {
       id: virtualNetworkId
@@ -136,22 +142,34 @@ resource searchPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
   }
 }
 
-// ============================================================================
-// Private DNS Zone Group
-// ============================================================================
 
-resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (enablePrivateEndpoint && !empty(privateEndpointSubnetId)) {
-  parent: searchPrivateEndpoint
-  name: 'default'
+resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
+  name: searchNetworkInterfaceName
+  location: location
+  tags: tags
   properties: {
-    privateDnsZoneConfigs: [
+    ipConfigurations: [
       {
-        name: 'privatelink-search-windows-net'
+        name: 'privateEndpointIpConfig.f4565d30-9c61-4c4a-a545-1a93d21ee197'
         properties: {
-          privateDnsZoneId: searchDnsZone.id
+          privateIPAddress: '10.0.3.9'
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: privateEndpointSubnetId
+          }
+          privateIPAddressVersion: 'IPv4'
         }
       }
     ]
+    dnsSettings: {
+      dnsServers: []
+    }
+    enableAcceleratedNetworking: false
+    enableIPForwarding: false
+    disableTcpStateTracking: false
+    nicType: 'Standard'
+    auxiliaryMode: 'None'
+    auxiliarySku: 'None'
   }
 }
 

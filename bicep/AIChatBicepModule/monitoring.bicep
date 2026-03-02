@@ -29,6 +29,12 @@ param actionGroupName string = ''
 @description('Short name for the action group')
 param actionGroupShortName string = 'SmartDetect'
 
+var workspaceResourceId = resourceId(
+  'ai_ais-d01-ai-cognitive-tf_47a3ed04-da3b-4e2b-835a-4f309165b555_managed',
+  'Microsoft.OperationalInsights/workspaces',
+  'managed-ais-d01-ai-cognitive-tf-ws'
+)
+
 // ============================================================================
 // Log Analytics Workspace
 // ============================================================================
@@ -64,10 +70,8 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   kind: 'web'
   properties: {
     Application_Type: 'web'
-    Flow_Type: 'Redfield'
-    Request_Source: 'IbizaAIExtension'
     RetentionInDays: 90
-    WorkspaceResourceId: logAnalyticsWorkspace.id
+    WorkspaceResourceId: workspaceResourceId
     IngestionMode: 'LogAnalytics'
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'
@@ -107,54 +111,6 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-09-01-preview' = if (
         useCommonAlertSchema: true
       }
     ]
-  }
-}
-
-// ============================================================================
-// Smart Detector Alert Rule for Failure Anomalies
-// ============================================================================
-
-// Smart Detector Alert Rule with custom Action Group
-resource failureAnomaliesDetectorWithActionGroup 'Microsoft.AlertsManagement/smartDetectorAlertRules@2021-04-01' = if (!empty(actionGroupName)) {
-  name: 'failure-anomalies-${applicationInsightsName}'
-  location: 'global'
-  tags: tags
-  properties: {
-    description: 'Failure Anomalies notifies you of an unusual rise in the rate of failed HTTP requests or dependency calls.'
-    state: 'Enabled'
-    severity: 'Sev3'
-    frequency: 'PT1M'
-    detector: {
-      id: 'FailureAnomaliesDetector'
-    }
-    scope: [applicationInsights.id]
-    actionGroups: {
-      customEmailSubject: 'Failure Anomalies detected in ${applicationInsightsName}'
-      customWebhookPayload: '{}'
-      groupIds: [actionGroup.id]
-    }
-  }
-}
-
-// Smart Detector Alert Rule without custom Action Group (default)
-resource failureAnomaliesDetectorDefault 'Microsoft.AlertsManagement/smartDetectorAlertRules@2021-04-01' = if (empty(actionGroupName)) {
-  name: 'failure-anomalies-${applicationInsightsName}'
-  location: 'global'
-  tags: tags
-  properties: {
-    description: 'Failure Anomalies notifies you of an unusual rise in the rate of failed HTTP requests or dependency calls.'
-    state: 'Enabled'
-    severity: 'Sev3'
-    frequency: 'PT1M'
-    detector: {
-      id: 'FailureAnomaliesDetector'
-    }
-    scope: [applicationInsights.id]
-    actionGroups: {
-      customEmailSubject: 'Failure Anomalies detected in ${applicationInsightsName}'
-      customWebhookPayload: '{}'
-      groupIds: []
-    }
   }
 }
 
@@ -295,7 +251,7 @@ resource actionGroups_email 'microsoft.insights/actionGroups@2024-10-01-preview'
 }
 
 resource failure_anomalies 'microsoft.alertsmanagement/smartdetectoralertrules@2021-04-01' = {
-  name: 'Failure Anomalies - ${applicationInsights.name}'
+  name: 'Failure Anomalies - ${applicationInsightsName}'
   location: 'global'
   tags: tags
   properties: {
@@ -314,6 +270,129 @@ resource failure_anomalies 'microsoft.alertsmanagement/smartdetectoralertrules@2
         actionGroups_email.id
       ]
     }
+  }
+}
+
+// ============================================================================
+// Scheduled Query Alert Rules
+// Manages:
+//   microsoft.insights/scheduledqueryrules/ApplicationGatewayFirewallLog- DEV
+//   microsoft.insights/scheduledqueryrules/Severity
+// ============================================================================
+
+@description('Name of the Log Analytics Workspace to query against (for alert rules)')
+#disable-next-line no-unused-params
+param alertQueryWorkspaceId string = ''
+
+@description('Enable scheduled query alert rules')
+param enableScheduledQueryRules bool = true
+
+@description('Name of the Application Gateway to monitor with the alert rules')
+param applicationGatewayName string
+
+var applicationGatewayId = resourceId(
+  'Microsoft.Network/applicationGateways',
+  applicationGatewayName
+)
+
+resource appGatewayFirewallLogAlert 'microsoft.insights/scheduledqueryrules@2023-03-15-preview' = if (enableScheduledQueryRules) {
+  name: 'ApplicationGatewayFirewallLog- DEV'
+  location: location
+  tags: tags
+  properties: {
+    evaluationFrequency: 'PT5M'
+    scopes: [
+      applicationGatewayId
+    ]
+    severity: 1
+    windowSize: 'PT5M'
+    targetResourceTypes: [
+      'Microsoft.Network/applicationGateways'
+    ]
+    actions: {
+      actionGroups: [
+        actionGroups_email.id
+      ]
+    }
+    criteria: {
+      allOf: [
+        {
+          query: 'AzureDiagnostics\n| where Category == "ApplicationGatewayFirewallLog"\n'
+          timeAggregation: 'Count'
+          operator: 'GreaterThanOrEqual'
+          threshold: 1
+          dimensions: [
+            {
+              name: 'Message'
+              operator: 'Include'
+              values: [
+                '*'
+              ]
+            }
+            {
+              name: 'ruleGroup_s'
+              operator: 'Include'
+              values: [
+                '*'
+              ]
+            }
+          ]
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+        }
+      ]
+    }
+    autoMitigate: false
+  }
+}
+
+resource severityAlert 'microsoft.insights/scheduledqueryrules@2023-03-15-preview' = if (enableScheduledQueryRules) {
+  name: 'Severity'
+  location: location
+  tags: tags
+  properties: {
+    enabled: true
+    evaluationFrequency: 'PT5M'
+    scopes: [
+      applicationInsights.id
+    ]
+    severity: 1
+    windowSize: 'PT5M'
+    targetResourceTypes: [
+      'microsoft.insights/components'
+    ]
+    actions: {
+      actionGroups: [
+        actionGroups_email.id
+      ]
+    }
+    criteria: {
+      allOf: [
+        {
+          query: 'union isfuzzy=true traces\n| where severityLevel in ("3")\n| order by timestamp desc\n| take 100\n'
+          timeAggregation: 'Total'
+          operator: 'GreaterThanOrEqual'
+          threshold: 1
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+          metricMeasureColumn: 'itemCount'
+          dimensions: [
+            {
+              name: 'message'
+              operator: 'Include'
+              values: [
+                '*'
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    autoMitigate: false
   }
 }
 

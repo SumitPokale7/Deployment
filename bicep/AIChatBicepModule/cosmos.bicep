@@ -38,6 +38,9 @@ param virtualNetworkId string = ''
 @description('Name for DNS zone virtual network link')
 param cosmosDbDnsZoneLinkName string = ''
 
+@description('Name of the Cosmos DB network interface')
+param cosmosDbNetworkInterfaceName string = ''
+
 // ============================================================================
 // Cosmos DB Account
 // ============================================================================
@@ -52,6 +55,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-08-15' = {
   }
   properties: {
     publicNetworkAccess: enablePrivateEndpoint ? 'Disabled' : 'Enabled'
+    defaultIdentity: 'FirstPartyIdentity'
     enableAutomaticFailover: false
     enableMultipleWriteLocations: true
     isVirtualNetworkFilterEnabled: true
@@ -154,6 +158,49 @@ resource cosmosPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' =
       id: privateEndpointSubnetId
     }
     ipConfigurations: []
+  }
+}
+
+
+resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
+  name: cosmosDbNetworkInterfaceName
+  location: location
+  tags: tags
+  properties: {
+    ipConfigurations: [
+      {
+        name: 'privateEndpointIpConfig.e3e09800-8d0e-4c18-9dc3-615af1c155e1'
+        properties: {
+          privateIPAddress: '10.0.3.7'
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: privateEndpointSubnetId
+          }
+          primary: true
+          privateIPAddressVersion: 'IPv4'
+        }
+      }
+      {
+        name: 'privateEndpointIpConfig.7db21eb5-8d35-4a20-ae8b-a9f15686a010'
+        properties: {
+          privateIPAddress: '10.0.3.8'
+          privateIPAllocationMethod: 'Dynamic'
+          subnet: {
+            id: privateEndpointSubnetId
+          }
+          privateIPAddressVersion: 'IPv4'
+        }
+      }
+    ]
+    dnsSettings: {
+      dnsServers: []
+    }
+    enableAcceleratedNetworking: false
+    enableIPForwarding: false
+    disableTcpStateTracking: false
+    nicType: 'Standard'
+    auxiliaryMode: 'None'
+    auxiliarySku: 'None'
   }
 }
 

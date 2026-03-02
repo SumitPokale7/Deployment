@@ -60,6 +60,7 @@ param cosmosdbAccountName = 'cdbacct-d01-ai-cognitive-tf'
 param cosmosdbName = 'cdb-d01-ai-cognitive-tf'
 param secondaryDbLocation = 'westus'
 param cosmosdbEndpointName = 'pe-d01-ai-cognitive-cdb-tf'
+param cosmosDbNetworkInterfaceName = 'pe-d01-ai-cognitive-cdb-tf.nic.1a6e1764-fb9b-4430-9b81-3a4d90af7ad7'
 param cosmosPrivateServiceConnectionName = 'pe-d01-ai-cognitive-cdb-tf'
 param cosmosOpenaiPrivateDnsZoneName = 'privatelink.documents.azure.com'
 param azurermPrivateDnsZoneVirtualNetworkLinkCosmos = 'pdnslink-d01-ai-cognitive-cosmos-tf'
@@ -70,9 +71,10 @@ param azurermPrivateDnsZoneVirtualNetworkLinkCosmos = 'pdnslink-d01-ai-cognitive
 
 param searchServiceName = 'ssvc-d01-ai-cognitive-tf'
 param searchPrivateEndpointName = 'pe-d01-ai-cognitive-ssvc-tf'
-param searchPrivateServiceConnectionName = 'pe-d01-ai-cognitive-ssvc-tf'
-param searchPrivateDnsZoneName = 'privatelink-search-windows-net'
+param searchPrivateServiceConnectionName = 'psc-d01-ai-cognitive-ssvc-tf'
+param searchPrivateDnsZoneName = 'privatelink.search.windows.net'
 param azurermPrivateDnsZoneVirtualNetworkLinkSearch = 'pdnslink-d01-ai-cognitive-ssvc-tf'
+param searchNetworkInterfaceName = 'pe-d01-ai-cognitive-ssvc-tf.nic.ee953131-0150-45ca-be6a-6b716f6219a7'
 
 // ============================================================================
 // Cognitive Services - Form Recognizer Parameters
@@ -81,6 +83,7 @@ param azurermPrivateDnsZoneVirtualNetworkLinkSearch = 'pdnslink-d01-ai-cognitive
 param formRecognizerName = 'fr-d01-ai-cognitive-westus2-tf'
 param formRecognizerLocation = 'westus2'
 param formRecognizerSubdomainName = 'fr-d01-westus2-truchat'
+param formRecognizerNetworkInterfaceName = 'pe-d01-ai-cognitive-fr-tf.nic.f018920a-2d44-4f9b-a013-17e4433e3a2b'
 param documentIntelligenceOpenaiPrivateDnsZoneName = 'privatelink.cognitiveservices.azure.com'
 param documentPrivateEndpointName = 'pe-d01-ai-cognitive-fr-tf'
 param documentReaderServiceConnectionName = 'psc-d01-ai-cognitive-fr-tf'
@@ -96,6 +99,7 @@ param translatorLocation = 'centralus'
 param translatorSubdomainName = 'tr-d01-ai-cognitive-tf'
 param translatorPrivateEndpointName = 'pe-d01-ai-cognitive-tr-tf'
 param translatorPrivateServiceConnectionName = 'psc-d01-ai-cognitive-tr-tf'
+param translatorNetworkInterfaceName = 'pe-d01-ai-cognitive-tr-tf.nic.9be5f3be-e4e7-456b-9273-c188618b59b3'
 
 // ============================================================================
 // Cognitive Services - OpenAI Parameters
@@ -111,29 +115,34 @@ param openaiAccounts = {
     sku_name: 'S0'
     subdomain_name: 'oai-d01-eastus2-truchat'
     private_endpoint_name: 'pe-d01-ai-cognitive-eastus2-oai-tf'
-    private_service_connection_name: 'pe-d01-ai-cognitive-eastus2-oai-tf'
+    private_service_connection_name: 'psc-d01-ai-cognitive-eastus2-oai-tf'
+    network_interface_name: 'pe-d01-ai-cognitive-eastus2-oai-tf.nic.0eb14042-bf07-4fdb-9530-e00f6bcb29da'
     models: {
       'text-embedding-ada-002': {
         deployment_name: 'embedding'
         model_name: 'text-embedding-ada-002'
+        model_version: '2'
         sku_name: 'Standard'
         capacity: 175
       }
       'gpt-4.1': {
         deployment_name: 'gpt-4.1'
         model_name: 'gpt-4.1'
+        model_version: '2025-04-14'
         sku_name: 'GlobalStandard'
         capacity: 200
       }
       'gpt-4.1-excel-parser': {
         deployment_name: 'gpt-4.1-excel-parser'
         model_name: 'gpt-4.1'
+        model_version: '2025-04-14'
         sku_name: 'GlobalStandard'
         capacity: 500
       }
       'model-router': {
         deployment_name: 'model-router'
         model_name: 'model-router'
+        model_version: '2025-08-07'
         sku_name: 'GlobalStandard'
         capacity: 200
       }
@@ -160,6 +169,7 @@ param frontEndCertId = 'https://kv-atlas-itportfolio-np.vault.azure.net:443/cert
 param acaEnvName = 'managed-private-environment-tf'
 param acaInfrastructureResourceGroupName = 'ME_managed-private-environment-tf_rg-cmfg-d01-psa-cognitiveservices-tf_centralus'
 param acaEnvPrivateEndpointName = 'pe-d01-ai-cognitive-aca-env-tf'
+param acaNetworkInterfaceName = 'pe-d01-ai-cognitive-aca-env-tf.nic.38dbfdda-2ff4-4c30-a34c-aa5576440c84'
 param acaPrivateEndpointConnectionName = 'psc-d01-ai-cognitive-aca-env-tf'
 param acaPrivateDnsZoneVirtualNetworkLinkName = 'pdnslink-d01-ai-cognitive-aca-tf'
 
@@ -339,6 +349,10 @@ param containerApps = {
       {
         name: 'LANGUAGE_TRANSLATOR_QUEUE_LISTENER_INTERVAL_IN_SECONDS'
         value: '30'
+      }
+      {
+        name: 'AZURE_DOC_TRANSLATOR_API_KEY'
+        value: 'CY3lwNQDQuIG9sGvV5tBYAsHNWUslhLeO614nuiRctX9LGYTAhFWJQQJ99BGAC1i4TkXJ3w3AAAbACOGAB9T'
       }
       {
         name: 'AZURE_DOC_TRANSLATOR_ENDPOINT'
@@ -925,7 +939,7 @@ param containerApps = {
       }
       {
         name: 'PURGE_JOB_CRON_EXPR'
-        value: '0 2 * * *'
+        value: '56 17 * * *'
       }
       {
         name: 'DATA_RETENTION_PERIOD_DAYS'
@@ -1021,7 +1035,7 @@ param containerApps = {
       }
       {
         name: 'ENABLE_AUTO_PURGE'
-        value: 'false'
+        value: 'true'
       }
       {
         name: 'COSMOSDB_NOSQL_APP_CONFIG_CONTAINER_NAME'
@@ -1874,6 +1888,24 @@ param containerApps = {
         name: 'SAVE_EVALUATION_TESTS_IN_BLOB'
         value: 'True'
       }
+      {
+        name: 'AZURE_APP_REGISTRATION_CLIENT_ID'
+      }
+      {
+        name: 'AZURE_APP_REGISTRATION_CLIENT_SECRET_NAME'
+      }
+      {
+        name: 'CITATION_SOURCE_CONTENT_MAX_CHAR_LENGTH'
+        value: '10000'
+      }
+      {
+        name: 'DOCUMENT_RAG_TOP_K'
+        value: '20'
+      }
+      {
+        name: 'LIBRARY_RAG_TOP_K'
+        value: '20'
+      }
     ]
   }
   document_ingestion_api: {
@@ -2085,7 +2117,7 @@ param containerApps = {
       }
       {
         name: 'PREMIUM_QUOTA_AD_GROUPS'
-        value: ' '
+        value: 'null'
       }
     ]
   }
