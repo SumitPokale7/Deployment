@@ -51,6 +51,9 @@ param agwafName string
 @description('Name of the Private Endpoint NSG')
 param privateEndpointNsgName string
 
+@description('Destination IP for NSG rules (backend service IP)')
+param nsgDestinationIp string = ''
+
 // ============================================================================
 // Public IP Parameters
 // ============================================================================
@@ -127,7 +130,7 @@ resource privateEndpointNsg 'Microsoft.Network/networkSecurityGroups@2024-07-01'
           sourceAddressPrefix: '*'
           sourcePortRange: '*'
           destinationAddressPrefixes: [
-            '20.118.40.5'
+            nsgDestinationIp
           ]
           destinationPortRange: '443'
         }
@@ -142,7 +145,7 @@ resource privateEndpointNsg 'Microsoft.Network/networkSecurityGroups@2024-07-01'
           sourceAddressPrefix: '*'
           sourcePortRange: '*'
           destinationAddressPrefixes: [
-            '20.118.40.5'
+            nsgDestinationIp
           ]
           destinationPortRange: '443'
         }
@@ -217,7 +220,7 @@ resource agwafSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-07-01' = {
     ]
      applicationGatewayIPConfigurations: [
       {
-        id: '/subscriptions/${subscription().subscriptionId}/resourceGroups/rg-cmfg-d01-psa-cognitiveservices-tf/providers/Microsoft.Network/applicationGateways/${agwafName}/gatewayIPConfigurations/agwaf-gateway-ip-config'
+        id: '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.Network/applicationGateways/${agwafName}/gatewayIPConfigurations/agwaf-gateway-ip-config'
       }
     ]
   }
@@ -238,7 +241,7 @@ resource privateEndpointSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-0
         service: 'Microsoft.CognitiveServices'
       }
     ]
-    // defaultOutboundAccess: true
+    defaultOutboundAccess: true
   }
   dependsOn: [
     agwafSubnet

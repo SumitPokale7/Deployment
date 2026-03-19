@@ -24,6 +24,19 @@ param cmdbOwnedByEmail = 'Rajeev.Ramesh@trustage.com'
 param cmdbPortfolio = ''
 
 // ============================================================================
+// User Assigned Managed Identity Parameters
+// ===========================================================================
+
+param userAssignedIdentityName = 'MI-APIM-ai-cognitive-NP'
+
+// ============================================================================
+// Dashboard Parameters
+// ===========================================================================
+
+param dashboard1Name = '445536f6-e76d-48d1-ab67-5208690c911b'
+param dashboard2Name = '47a3ed04-da3b-4e2b-835a-4f309165b555-dashboard'
+
+// ============================================================================
 // Networking Parameters
 // ============================================================================
 
@@ -35,6 +48,7 @@ param acaSubnetName = 'ca-d01-ai-cognitive-pe-subnet-tf'
 param agwafPublicIpName = 'pip-d01-ai-cognitive-agwaf-tf'
 param frontendNsgName = 'nsg-d01-ai-cognitive-frontend-tf'
 param backendNsgName = 'nsg-d01-ai-cognitive-backend-tf'
+param nsgDestinationIp = '20.118.40.5'
 
 // ============================================================================
 // Monitoring Parameters
@@ -42,6 +56,7 @@ param backendNsgName = 'nsg-d01-ai-cognitive-backend-tf'
 
 param aisName = 'ais-d01-ai-cognitive-tf'
 param acaLogAnalyticsWorkspaceName = 'law-d01-ai-cognitive-tf'
+param SeverityAlertName = 'Severity'
 
 // ============================================================================
 // Storage Parameters
@@ -64,6 +79,8 @@ param cosmosDbNetworkInterfaceName = 'pe-d01-ai-cognitive-cdb-tf.nic.1a6e1764-fb
 param cosmosPrivateServiceConnectionName = 'pe-d01-ai-cognitive-cdb-tf'
 param cosmosOpenaiPrivateDnsZoneName = 'privatelink.documents.azure.com'
 param azurermPrivateDnsZoneVirtualNetworkLinkCosmos = 'pdnslink-d01-ai-cognitive-cosmos-tf'
+param cosmosDbNetworkInterfaceIPName = 'privateEndpointIpConfig.e3e09800-8d0e-4c18-9dc3-615af1c155e1'
+param cosmosDbNetworkInterfaceIPSecondaryName = 'privateEndpointIpConfig.7db21eb5-8d35-4a20-ae8b-a9f15686a010'
 
 // ============================================================================
 // Search Parameters
@@ -75,6 +92,7 @@ param searchPrivateServiceConnectionName = 'psc-d01-ai-cognitive-ssvc-tf'
 param searchPrivateDnsZoneName = 'privatelink.search.windows.net'
 param azurermPrivateDnsZoneVirtualNetworkLinkSearch = 'pdnslink-d01-ai-cognitive-ssvc-tf'
 param searchNetworkInterfaceName = 'pe-d01-ai-cognitive-ssvc-tf.nic.ee953131-0150-45ca-be6a-6b716f6219a7'
+param searchNetworkInterfaceIPName = 'privateEndpointIpConfig.f4565d30-9c61-4c4a-a545-1a93d21ee197'
 
 // ============================================================================
 // Cognitive Services - Form Recognizer Parameters
@@ -84,11 +102,14 @@ param formRecognizerName = 'fr-d01-ai-cognitive-westus2-tf'
 param formRecognizerLocation = 'westus2'
 param formRecognizerSubdomainName = 'fr-d01-westus2-truchat'
 param formRecognizerNetworkInterfaceName = 'pe-d01-ai-cognitive-fr-tf.nic.f018920a-2d44-4f9b-a013-17e4433e3a2b'
+param formRecognizerNetworkInterfaceIPName = 'privateEndpointIpConfig.8186a415-d8db-49ac-9dc2-c284c7bd89e9'
 param documentIntelligenceOpenaiPrivateDnsZoneName = 'privatelink.cognitiveservices.azure.com'
 param documentPrivateEndpointName = 'pe-d01-ai-cognitive-fr-tf'
 param documentReaderServiceConnectionName = 'psc-d01-ai-cognitive-fr-tf'
 param azurermPrivateFrDnsZoneVirtualNetworkLink = 'pdnslink-d01-ai-cognitive-fr-tf'
 param embeddingQuota = '175'
+param privatednszonename = 'privatelink.centralus.azurecontainerapps.io'
+param privatednszonelinkname = 'pdnslink-d01-ai-cognitive-aca-tf'
 
 // ============================================================================
 // Cognitive Services - Translator Parameters
@@ -100,6 +121,7 @@ param translatorSubdomainName = 'tr-d01-ai-cognitive-tf'
 param translatorPrivateEndpointName = 'pe-d01-ai-cognitive-tr-tf'
 param translatorPrivateServiceConnectionName = 'psc-d01-ai-cognitive-tr-tf'
 param translatorNetworkInterfaceName = 'pe-d01-ai-cognitive-tr-tf.nic.9be5f3be-e4e7-456b-9273-c188618b59b3'
+param translatorNetworkInterfaceIPName = 'privateEndpointIpConfig.4e1a693f-b8d8-47a9-99f1-b771b9a0b42d'
 
 // ============================================================================
 // Cognitive Services - OpenAI Parameters
@@ -117,6 +139,7 @@ param openaiAccounts = {
     private_endpoint_name: 'pe-d01-ai-cognitive-eastus2-oai-tf'
     private_service_connection_name: 'psc-d01-ai-cognitive-eastus2-oai-tf'
     network_interface_name: 'pe-d01-ai-cognitive-eastus2-oai-tf.nic.0eb14042-bf07-4fdb-9530-e00f6bcb29da'
+    openaiAccountsipconfigname: 'privateEndpointIpConfig.f150ca74-ff66-46d7-bc91-42887dd39571'
     models: {
       'text-embedding-ada-002': {
         deployment_name: 'embedding'
@@ -150,6 +173,12 @@ param openaiAccounts = {
   }
 }
 
+// ===========================================================================
+// Monitoring Parameters
+// ===========================================================================
+
+param appGatewayFirewallLogAlertName = 'ApplicationGatewayFirewallLog- DEV'
+
 // ============================================================================
 // Key Vault Parameters
 // ============================================================================
@@ -159,11 +188,14 @@ param frontEndCertKvName = 'kv-d01-ai-cognitive-tf'
 param frontEndCertKvResourceGroupName = 'RG-CMFG-D01-PSA-CognitiveServices-TF'
 param frontEndAzurermAppServiceCertificateName = 'chatdev-trustage-cert-secret'
 param frontEndAzurermAppServiceCertificatePassword = 'chatdev-trustage-cert-password'
+param cognitiveKeyVaultName = 'kv-d01-ai-cognitive-01'
 param frontEndHostName = 'chatdev.trustage.com'
 param frontEndCertId = 'https://kv-atlas-itportfolio-np.vault.azure.net:443/certificates/truPilot-Trustagedev-cert/1ffcdfdb827846f5a59b6a11bfa62eae'
 
 // ============================================================================
 // Container Apps Parameters
+// NOTE: Container Apps are managed by CI/CD pipelines, NOT Bicep
+// The containerApps object is used for Application Gateway routing configuration
 // ============================================================================
 
 param acaEnvName = 'managed-private-environment-tf'
@@ -172,7 +204,10 @@ param acaEnvPrivateEndpointName = 'pe-d01-ai-cognitive-aca-env-tf'
 param acaNetworkInterfaceName = 'pe-d01-ai-cognitive-aca-env-tf.nic.38dbfdda-2ff4-4c30-a34c-aa5576440c84'
 param acaPrivateEndpointConnectionName = 'psc-d01-ai-cognitive-aca-env-tf'
 param acaPrivateDnsZoneVirtualNetworkLinkName = 'pdnslink-d01-ai-cognitive-aca-tf'
+param containerAppEnvNetworkInterfaceIpName ='privateEndpointIpConfig.43eaa636-8124-49c4-9b0c-4e7024357e32'
 
+// Container Apps config - FOR APPLICATION GATEWAY ROUTING ONLY
+// Apps themselves are created/updated by CI/CD pipelines
 param containerApps = {
   translation_api: {
     name: 'ca-d01-ai-translationapi-tf'

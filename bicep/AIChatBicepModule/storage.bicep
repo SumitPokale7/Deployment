@@ -55,16 +55,16 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' = {
     }
     supportsHttpsTrafficOnly: true
     encryption: {
-      services: {
-        file: {
-          keyType: 'Account'
-          enabled: true
-        }
-        blob: {
-          keyType: 'Account'
-          enabled: true
-        }
-      }
+      // services: {
+      //   file: {
+      //     keyType: 'Account'
+      //     enabled: true
+      //   }
+      //   blob: {
+      //     keyType: 'Account'
+      //     enabled: true
+      //   }
+      // }
       keySource: 'Microsoft.Storage'
     }
     accessTier: 'Hot'

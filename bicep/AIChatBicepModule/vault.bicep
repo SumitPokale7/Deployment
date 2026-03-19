@@ -10,6 +10,10 @@ param location string
 @description('Tags to apply to all resources')
 param tags object
 
+@description('Environment name - used for conditional deployment')
+@allowed(['dev', 'demo', 'prod'])
+param environment string
+
 @description('Name of the Key Vault')
 param keyVaultName string
 
@@ -25,6 +29,9 @@ param enableSoftDelete bool = true
 @description('Public network access setting')
 @allowed(['Enabled', 'Disabled'])
 param publicNetworkAccess string = 'Enabled'
+
+@description('Name of the cognitive services Key Vault')
+param cognitiveKeyVaultName string
 
 // ============================================================================
 // Key Vault
@@ -50,8 +57,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
   }
 }
 
-resource vaults_kv_d01_ai_cognitive_01 'Microsoft.KeyVault/vaults@2024-12-01-preview' = {
-  name: 'kv-d01-ai-cognitive-01'
+resource vaults_kv_d01_ai_cognitive_01 'Microsoft.KeyVault/vaults@2024-12-01-preview' = if (environment == 'dev') {
+  name: cognitiveKeyVaultName
   location: 'eastus2'
   tags: union(tags, {
     AtlasPurpose: 'Atlas-KeyVault-Generic'

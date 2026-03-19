@@ -29,11 +29,35 @@ param actionGroupName string = ''
 @description('Short name for the action group')
 param actionGroupShortName string = 'SmartDetect'
 
-var workspaceResourceId = resourceId(
-  'ai_ais-d01-ai-cognitive-tf_47a3ed04-da3b-4e2b-835a-4f309165b555_managed',
-  'Microsoft.OperationalInsights/workspaces',
-  'managed-ais-d01-ai-cognitive-tf-ws'
+// var workspaceResourceId = resourceId(
+//   'ai_ais-d01-ai-cognitive-tf_47a3ed04-da3b-4e2b-835a-4f309165b555_managed',
+//   'Microsoft.OperationalInsights/workspaces',
+//   'managed-ais-d01-ai-cognitive-tf-ws'
+// )
+
+@description('Name of the Severity alert rule')
+param SeverityAlertName string
+
+@description('Name of the Log Analytics Workspace to query against (for alert rules)')
+#disable-next-line no-unused-params
+param alertQueryWorkspaceId string = ''
+
+@description('Enable scheduled query alert rules')
+param enableScheduledQueryRules bool = true
+
+@description('Name of the Application Gateway to monitor with the alert rules')
+param applicationGatewayName string
+
+var applicationGatewayId = resourceId(
+  'Microsoft.Network/applicationGateways',
+  applicationGatewayName
 )
+
+@description('Environment name for alert naming (dev, demo, prod)')
+param environment string = 'dev'
+
+@description('Name of the alert for Application Gateway Firewall Logs')
+param appGatewayFirewallLogAlertName string
 
 // ============================================================================
 // Log Analytics Workspace
@@ -48,9 +72,6 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
       name: logAnalyticsSku
     }
     retentionInDays: retentionInDays
-    features: {
-      enableLogAccessUsingOnlyResourcePermissions: true
-    }
     workspaceCapping: {
       dailyQuotaGb: -1
     }
@@ -71,7 +92,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   properties: {
     Application_Type: 'web'
     RetentionInDays: 90
-    WorkspaceResourceId: workspaceResourceId
+    WorkspaceResourceId: logAnalyticsWorkspace.id
     IngestionMode: 'LogAnalytics'
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'
@@ -123,16 +144,6 @@ resource degradationInDependencyDuration 'microsoft.insights/components/Proactiv
   parent: applicationInsights
   name: 'degradationindependencyduration'
   properties: {
-    ruleDefinitions: {
-      Name: 'degradationindependencyduration'
-      DisplayName: 'Degradation in dependency duration'
-      Description: 'Smart Detection rules notify you of performance anomaly issues.'
-      HelpUrl: 'https://docs.microsoft.com/en-us/azure/application-insights/app-insights-proactive-performance-diagnostics'
-      IsHidden: false
-      IsEnabledByDefault: true
-      IsInPreview: false
-      SupportsEmailNotifications: true
-    }
     enabled: true
     sendEmailsToSubscriptionOwners: true
     customEmails: []
@@ -143,16 +154,6 @@ resource degradationInServerResponseTime 'microsoft.insights/components/Proactiv
   parent: applicationInsights
   name: 'degradationinserverresponsetime'
   properties: {
-    ruleDefinitions: {
-      Name: 'degradationinserverresponsetime'
-      DisplayName: 'Degradation in server response time'
-      Description: 'Smart Detection rules notify you of performance anomaly issues.'
-      HelpUrl: 'https://docs.microsoft.com/en-us/azure/application-insights/app-insights-proactive-performance-diagnostics'
-      IsHidden: false
-      IsEnabledByDefault: true
-      IsInPreview: false
-      SupportsEmailNotifications: true
-    }
     enabled: true
     sendEmailsToSubscriptionOwners: true
     customEmails: []
@@ -163,16 +164,6 @@ resource longDependencyDuration 'microsoft.insights/components/ProactiveDetectio
   parent: applicationInsights
   name: 'longdependencyduration'
   properties: {
-    ruleDefinitions: {
-      Name: 'longdependencyduration'
-      DisplayName: 'Long dependency duration'
-      Description: 'Smart Detection rules notify you of performance anomaly issues.'
-      HelpUrl: 'https://docs.microsoft.com/en-us/azure/application-insights/app-insights-proactive-performance-diagnostics'
-      IsHidden: false
-      IsEnabledByDefault: true
-      IsInPreview: false
-      SupportsEmailNotifications: true
-    }
     enabled: true
     sendEmailsToSubscriptionOwners: true
     customEmails: []
@@ -183,16 +174,6 @@ resource slowPageLoadTime 'microsoft.insights/components/ProactiveDetectionConfi
   parent: applicationInsights
   name: 'slowpageloadtime'
   properties: {
-    ruleDefinitions: {
-      Name: 'slowpageloadtime'
-      DisplayName: 'Slow page load time'
-      Description: 'Smart Detection rules notify you of performance anomaly issues.'
-      HelpUrl: 'https://docs.microsoft.com/en-us/azure/application-insights/app-insights-proactive-performance-diagnostics'
-      IsHidden: false
-      IsEnabledByDefault: true
-      IsInPreview: false
-      SupportsEmailNotifications: true
-    }
     enabled: true
     sendEmailsToSubscriptionOwners: true
     customEmails: []
@@ -203,16 +184,6 @@ resource slowServerResponseTime 'microsoft.insights/components/ProactiveDetectio
   parent: applicationInsights
   name: 'slowserverresponsetime'
   properties: {
-    ruleDefinitions: {
-      Name: 'slowserverresponsetime'
-      DisplayName: 'Slow server response time'
-      Description: 'Smart Detection rules notify you of performance anomaly issues.'
-      HelpUrl: 'https://docs.microsoft.com/en-us/azure/application-insights/app-insights-proactive-performance-diagnostics'
-      IsHidden: false
-      IsEnabledByDefault: true
-      IsInPreview: false
-      SupportsEmailNotifications: true
-    }
     enabled: true
     sendEmailsToSubscriptionOwners: true
     customEmails: []
@@ -223,7 +194,7 @@ resource slowServerResponseTime 'microsoft.insights/components/ProactiveDetectio
 // ===========================================================================
 // Email Action Group for Failure Anomalies
 // ===========================================================================
-resource actionGroups_email 'microsoft.insights/actionGroups@2024-10-01-preview' = {
+resource actionGroups_email 'microsoft.insights/actionGroups@2024-10-01-preview' = if (environment == 'dev') {
   name: 'email_achyuth'
   location: 'Global'
   tags: tags
@@ -273,30 +244,8 @@ resource failure_anomalies 'microsoft.alertsmanagement/smartdetectoralertrules@2
   }
 }
 
-// ============================================================================
-// Scheduled Query Alert Rules
-// Manages:
-//   microsoft.insights/scheduledqueryrules/ApplicationGatewayFirewallLog- DEV
-//   microsoft.insights/scheduledqueryrules/Severity
-// ============================================================================
-
-@description('Name of the Log Analytics Workspace to query against (for alert rules)')
-#disable-next-line no-unused-params
-param alertQueryWorkspaceId string = ''
-
-@description('Enable scheduled query alert rules')
-param enableScheduledQueryRules bool = true
-
-@description('Name of the Application Gateway to monitor with the alert rules')
-param applicationGatewayName string
-
-var applicationGatewayId = resourceId(
-  'Microsoft.Network/applicationGateways',
-  applicationGatewayName
-)
-
 resource appGatewayFirewallLogAlert 'microsoft.insights/scheduledqueryrules@2023-03-15-preview' = if (enableScheduledQueryRules) {
-  name: 'ApplicationGatewayFirewallLog- DEV'
+  name: appGatewayFirewallLogAlertName
   location: location
   tags: tags
   properties: {
@@ -349,7 +298,7 @@ resource appGatewayFirewallLogAlert 'microsoft.insights/scheduledqueryrules@2023
 }
 
 resource severityAlert 'microsoft.insights/scheduledqueryrules@2023-03-15-preview' = if (enableScheduledQueryRules) {
-  name: 'Severity'
+  name: SeverityAlertName
   location: location
   tags: tags
   properties: {

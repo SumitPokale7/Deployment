@@ -54,6 +54,9 @@ param searchDnsZoneLinkName string = ''
 @description('Name of the Search network interface')
 param searchNetworkInterfaceName string
 
+@description('Name of the Search network interface IP configuration')
+param searchNetworkInterfaceIPName string
+
 // ============================================================================
 // Azure AI Search Service
 // ============================================================================
@@ -150,7 +153,7 @@ resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
   properties: {
     ipConfigurations: [
       {
-        name: 'privateEndpointIpConfig.f4565d30-9c61-4c4a-a545-1a93d21ee197'
+        name: searchNetworkInterfaceIPName
         properties: {
           privateIPAddress: '10.0.3.9'
           privateIPAllocationMethod: 'Dynamic'

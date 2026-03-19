@@ -29,6 +29,12 @@ param privateEndpointSubnetId string = ''
 @description('Name of the private endpoint')
 param cosmosDbPrivateEndpointName string = ''
 
+@description('Name of the Cosmos DB network interface IP configuration')
+param cosmosDbNetworkInterfaceIPName string = ''
+
+@description('Name of the Cosmos DB network interface secondary IP configuration')
+param cosmosDbNetworkInterfaceIPSecondaryName string = ''
+
 @description('Cosmos DB private DNS zone name')
 param cosmosDbDnsZoneName string = 'privatelink.documents.azure.com'
 
@@ -169,7 +175,7 @@ resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
   properties: {
     ipConfigurations: [
       {
-        name: 'privateEndpointIpConfig.e3e09800-8d0e-4c18-9dc3-615af1c155e1'
+        name: cosmosDbNetworkInterfaceIPName
         properties: {
           privateIPAddress: '10.0.3.7'
           privateIPAllocationMethod: 'Dynamic'
@@ -181,7 +187,7 @@ resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
         }
       }
       {
-        name: 'privateEndpointIpConfig.7db21eb5-8d35-4a20-ae8b-a9f15686a010'
+        name: cosmosDbNetworkInterfaceIPSecondaryName
         properties: {
           privateIPAddress: '10.0.3.8'
           privateIPAllocationMethod: 'Dynamic'
@@ -214,7 +220,7 @@ resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneG
   properties: {
     privateDnsZoneConfigs: [
       {
-        name: 'privatelink.documents.azure.com'
+        name: cosmosDbDnsZoneName
         properties: {
           privateDnsZoneId: cosmosDnsZone.id
         }

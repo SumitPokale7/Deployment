@@ -78,6 +78,9 @@ param frontendNsgName string
 #disable-next-line no-unused-params
 param backendNsgName string
 
+@description('Destination IP for NSG rules (backend service IP)')
+param nsgDestinationIp string
+
 // ============================================================================
 // Monitoring Parameters
 // ============================================================================
@@ -87,6 +90,9 @@ param aisName string
 
 @description('Name of the Log Analytics Workspace')
 param acaLogAnalyticsWorkspaceName string
+
+@description('Name of the Severity alert rule')
+param SeverityAlertName string
 
 // ============================================================================
 // Storage Parameters
@@ -134,6 +140,12 @@ param azurermPrivateDnsZoneVirtualNetworkLinkCosmos string
 @description('Name of the Cosmos DB network interface')
 param cosmosDbNetworkInterfaceName string
 
+@description('Name of the Cosmos DB network interface IP configuration')
+param cosmosDbNetworkInterfaceIPName string = ''
+
+@description('Name of the Cosmos DB network interface secondary IP configuration')
+param cosmosDbNetworkInterfaceIPSecondaryName string = ''
+
 // ============================================================================
 // Search Parameters
 // ============================================================================
@@ -155,6 +167,9 @@ param azurermPrivateDnsZoneVirtualNetworkLinkSearch string
 
 @description('Name of the Search network interface')
 param searchNetworkInterfaceName string
+
+@description('Name of the Search network interface IP configuration')
+param searchNetworkInterfaceIPName string
 
 // ============================================================================
 // Cognitive Services - Form Recognizer Parameters
@@ -188,6 +203,15 @@ param embeddingQuota string
 @description('Name of the Form Recognizer network interface')
 param formRecognizerNetworkInterfaceName string
 
+@description('Name of the Form Recognizer network interface IP configuration')
+param formRecognizerNetworkInterfaceIPName string
+
+@description('Name of the private DNS zone')
+param privatednszonename string
+
+@description('Private DNS zone link name')
+param privatednszonelinkname string
+
 // ============================================================================
 // Cognitive Services - Translator Parameters
 // ============================================================================
@@ -209,6 +233,9 @@ param translatorPrivateServiceConnectionName string
 
 @description('Name of the Translator network interface')
 param translatorNetworkInterfaceName string
+
+@description('Name of the Translator network interface IP configuration')
+param translatorNetworkInterfaceIPName string
 
 // ============================================================================
 // Cognitive Services - OpenAI Parameters
@@ -255,6 +282,9 @@ param frontEndHostName string
 #disable-next-line no-unused-params
 param frontEndCertId string
 
+@description('Cognitive services Key Vault name')
+param cognitiveKeyVaultName string
+
 // ============================================================================
 // Container Apps Parameters
 // ============================================================================
@@ -289,8 +319,11 @@ param acaNetworkInterfaceName string
 @description('Name for the Container Apps DNS zone virtual network link')
 param acaPrivateDnsZoneVirtualNetworkLinkName string
 
-@description('Container apps configuration')
+@description('Container apps configuration - used for Application Gateway routing only. Apps are managed by CI/CD pipelines.')
 param containerApps object
+
+@description('Name of the Container App Environment network interface IP configuration')
+param containerAppEnvNetworkInterfaceIpName string = ''
 
 // ============================================================================
 // Application Gateway Parameters
@@ -335,6 +368,29 @@ param apimIp string
 param staticErrorPageUrl403 string
 
 // ============================================================================
+// User Assigned Managed Identity Parameters
+// ============================================================================
+@description('Name of the user assigned managed identity')
+param userAssignedIdentityName string
+
+// ===========================================================================
+// Dashboard Parameters
+// ===========================================================================
+
+@description('Name/ID of the first dashboard')
+param dashboard1Name string
+
+@description('Name/ID of the second dashboard')
+param dashboard2Name string
+
+// ============================================================================
+// Monitoring Parameters
+// ============================================================================
+
+@description('Name of the alert for Application Gateway Firewall Logs')
+param appGatewayFirewallLogAlertName string
+
+// ============================================================================
 // Module Deployments
 // ============================================================================
 
@@ -349,6 +405,7 @@ module networking 'networking.bicep' = {
     agwafName: agwafName
     privateEndpointNsgName: privateEndpointNsgName
     privateEndpointSubnetName: privateEndpointSubnetName
+    nsgDestinationIp: nsgDestinationIp
     containerAppSubnetName: acaSubnetName
     publicIpName: agwafPublicIpName
   }
@@ -363,6 +420,9 @@ module monitoring 'monitoring.bicep' = {
     applicationInsightsName: aisName
     logAnalyticsWorkspaceName: acaLogAnalyticsWorkspaceName
     applicationGatewayName: agwafName
+    SeverityAlertName: SeverityAlertName
+    environment: environment
+    appGatewayFirewallLogAlertName: appGatewayFirewallLogAlertName
   }
 }
 
@@ -384,7 +444,9 @@ module vault 'vault.bicep' = {
   params: {
     location: location
     tags: tags
+    environment: environment
     keyVaultName: keyVaultName
+    cognitiveKeyVaultName: cognitiveKeyVaultName
   }
 }
 
@@ -398,6 +460,8 @@ module cosmos 'cosmos.bicep' = {
     cosmosDbDatabaseName: cosmosdbName
     secondaryDbLocation: secondaryDbLocation
     cosmosDbPrivateEndpointName: cosmosdbEndpointName
+    cosmosDbNetworkInterfaceIPName: cosmosDbNetworkInterfaceIPName
+    cosmosDbNetworkInterfaceIPSecondaryName: cosmosDbNetworkInterfaceIPSecondaryName
     cosmosDbDnsZoneLinkName: azurermPrivateDnsZoneVirtualNetworkLinkCosmos
     cosmosDbDnsZoneName: cosmosOpenaiPrivateDnsZoneName
     cosmosDbNetworkInterfaceName: cosmosDbNetworkInterfaceName
@@ -420,6 +484,7 @@ module search 'search.bicep' = {
     searchDnsZoneName: searchPrivateDnsZoneName
     privateEndpointSubnetId: networking.outputs.privateEndpointSubnetId
     virtualNetworkId: networking.outputs.vnetId
+    searchNetworkInterfaceIPName: searchNetworkInterfaceIPName
   }
 }
 
@@ -429,6 +494,7 @@ module cognitive 'cognitive.bicep' = {
   params: {
     location: location
     tags: tags
+    environment: environment
     formRecognizerName: formRecognizerName
     formRecognizerLocation: formRecognizerLocation
     formRecognizerSubdomainName: formRecognizerSubdomainName
@@ -437,8 +503,10 @@ module cognitive 'cognitive.bicep' = {
     translatorLocation: translatorLocation
     translatorSubdomainName: translatorSubdomainName
     translatorNetworkInterfaceName: translatorNetworkInterfaceName
+    translatorNetworkInterfaceIPName: translatorNetworkInterfaceIPName
     formRecognizerPrivateEndpointName: documentPrivateEndpointName
     formRecognizerPrivateServiceConnectionName: documentReaderServiceConnectionName
+    formRecognizerNetworkInterfaceIPName: formRecognizerNetworkInterfaceIPName
     translatorPrivateEndpointName: translatorPrivateEndpointName
     translatorPrivateServiceConnectionName: translatorPrivateServiceConnectionName
     cognitiveServicesDnsZoneName: documentIntelligenceOpenaiPrivateDnsZoneName
@@ -450,10 +518,12 @@ module cognitive 'cognitive.bicep' = {
     virtualNetworkId: networking.outputs.vnetId
     openaiAccounts: openaiAccounts
     embeddingQuota: embeddingQuota
+    privatednszonename: privatednszonename
+    privatednszonelinkname: privatednszonelinkname
   }
 }
 
-// 9. Container Apps Module
+// 9. Container Apps Module (Environment & ACR only - Apps managed by CI/CD)
 module containerapp 'containerapp.bicep' = {
   name: 'containerapp-deployment'
   params: {
@@ -473,7 +543,10 @@ module containerapp 'containerapp.bicep' = {
     privateEndpointSubnetId: networking.outputs.privateEndpointSubnetId
     containerAppsDnsZoneLinkName: acaPrivateDnsZoneVirtualNetworkLinkName
     virtualNetworkId: networking.outputs.vnetId
-    containerApps: containerApps
+    containerApps: containerApps  // Used for reference only (AGW routing)
+    userAssignedIdentityName: userAssignedIdentityName
+    containerAppEnvNetworkInterfaceIpName: containerAppEnvNetworkInterfaceIpName
+
   }
 }
 
@@ -500,6 +573,17 @@ module agwaf 'agwaf.bicep' = {
     investmentStorageName: investmentStorageName
     // Static error page
     staticErrorPageUrl403: staticErrorPageUrl403
+  }
+}
+
+module dashboard 'dashboard.bicep' = {
+  name: 'dashboard-deployment'
+  params: {
+    tags: tags
+    environment: environment
+    dashboard1Name: dashboard1Name
+    dashboard2Name: dashboard2Name
+    applicationInsightsName: aisName
   }
 }
 

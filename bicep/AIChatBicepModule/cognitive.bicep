@@ -34,6 +34,15 @@ param translatorSubdomainName string
 @description('translator network interface name')
 param translatorNetworkInterfaceName string = ''
 
+@description('Name of the Translator network interface IP configuration')
+param translatorNetworkInterfaceIPName string = ''
+
+@description('Private DNS zone name')
+param privatednszonename string
+
+@description('Private DNS zone link name')
+param privatednszonelinkname string
+
 @description('Enable private endpoint for OpenAI')
 param enablePrivateEndpoint bool = true
 
@@ -48,6 +57,9 @@ param formRecognizerPrivateServiceConnectionName string = ''
 
 @description('form recognizer network interface name')
 param formRecognizerNetworkInterfaceName string = ''
+
+@description('Name of the Form Recognizer network interface IP configuration')
+param formRecognizerNetworkInterfaceIPName string = ''
 
 @description('Translator private endpoint name')
 param translatorPrivateEndpointName string = ''
@@ -69,7 +81,7 @@ param cognitiveServicesDnsZoneLinkName string = ''
 param cognitiveServicesDnsZoneVNetLinkSsvcName string = ''
 
 @description('OpenAI DNS zone name')
-param openAIDnsZoneName string = 'privatelink.openai.azure.com'
+param openAIDnsZoneName string
 
 @description('OpenAI DNS zone virtual network link name')
 param openAIDnsZoneLinkName string = ''
@@ -80,6 +92,11 @@ param embeddingQuota string = '175'
 
 @description('Virtual network link name for Cognitive Services DNS zone (search service)')
 param azurermPrivateDnsZoneVirtualNetworkLinkSearch string
+
+@description('Environment name - used for conditional deployment')
+@allowed(['dev', 'demo', 'prod'])
+#disable-next-line no-unused-params
+param environment string
 
 // ============================================================================
 // Form Recognizer (Document Intelligence)
@@ -152,6 +169,7 @@ resource cognitiveServicesDnsZoneLink 'Microsoft.Network/privateDnsZones/virtual
   location: 'global'
   tags: tags
   properties: {
+    resolutionPolicy: 'Default'
     registrationEnabled: false
     virtualNetwork: {
       id: virtualNetworkId
@@ -294,7 +312,7 @@ resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = [f
   properties: {
     ipConfigurations: [
       {
-        name: 'privateEndpointIpConfig.f150ca74-ff66-46d7-bc91-42887dd39571'
+        name: account.value.?openaiAccountsipconfigname ?? 'privateEndpointIpConfig'
         properties: {
           privateIPAddress: '10.0.3.15'
           privateIPAllocationMethod: 'Dynamic'
@@ -327,7 +345,7 @@ resource openaiPrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDn
   properties: {
     privateDnsZoneConfigs: [
       {
-        name: 'privatelink.openai.azure.com'
+        name: openAIDnsZoneName
         properties: {
           privateDnsZoneId: openAIDnsZone.id
         }
@@ -370,7 +388,7 @@ resource CognitivenetworkInterfaces 'Microsoft.Network/networkInterfaces@2024-07
   properties: {
     ipConfigurations: [
       {
-        name: 'privateEndpointIpConfig.8186a415-d8db-49ac-9dc2-c284c7bd89e9'
+        name: formRecognizerNetworkInterfaceIPName
         properties: {
           privateIPAddress: '10.0.3.11'
           privateIPAllocationMethod: 'Dynamic'
@@ -428,7 +446,7 @@ resource CognitiveenetworkInterfaces 'Microsoft.Network/networkInterfaces@2024-0
   properties: {
     ipConfigurations: [
       {
-        name: 'privateEndpointIpConfig.4e1a693f-b8d8-47a9-99f1-b771b9a0b42d'
+        name: translatorNetworkInterfaceIPName
         properties: {
           privateIPAddress: '10.0.3.14'
           privateIPAllocationMethod: 'Dynamic'
@@ -456,7 +474,7 @@ resource CognitiveenetworkInterfaces 'Microsoft.Network/networkInterfaces@2024-0
 // ===========================================================================
 
 resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  name: 'privatelink.centralus.azurecontainerapps.io'
+  name: privatednszonename
   location: 'global'
   tags: tags
   properties: {}
@@ -464,7 +482,7 @@ resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = {
 
 resource privateDnsZonesLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
   parent: privateDnsZones
-  name: 'pdnslink-d01-ai-cognitive-aca-tf'
+  name: privatednszonelinkname
   location: 'global'
   tags: tags
   properties: {

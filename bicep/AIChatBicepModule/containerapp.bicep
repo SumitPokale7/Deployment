@@ -32,13 +32,13 @@ param containerAppEnvName string
 param logAnalyticsWorkspaceId string
 
 @description('Log Analytics Customer ID')
-#disable-next-line no-unused-params
 param logAnalyticsCustomerId string
 
 @description('Infrastructure subnet ID for Container App Environment')
 param containerAppSubnetId string
 
-@description('Container Apps configuration object')
+@description('Container Apps configuration - NOT USED in this module. Apps are managed by CI/CD pipelines. Kept for interface compatibility with main.bicep.')
+#disable-next-line no-unused-params
 param containerApps object = {}
 
 @description('Internal load balancer enabled')
@@ -60,6 +60,9 @@ param containerAppEnvPrivateEndpointName string = ''
 @description('Network interface name for Container App Environment private endpoint')
 param containerAppEnvNetworkInterfaceName string = ''
 
+@description('Name of the Container App Environment network interface IP configuration')
+param containerAppEnvNetworkInterfaceIpName string = ''
+
 @description('Private endpoint connection name for Container App Environment')
 param containerAppEnvPrivateEndpointConnectionName string = ''
 
@@ -73,6 +76,19 @@ param containerAppsDnsZoneLinkName string = ''
 @description('Virtual network ID for DNS zone link')
 #disable-next-line no-unused-params
 param virtualNetworkId string = ''
+
+@description('Name of the user assigned managed identity')
+param userAssignedIdentityName string
+
+// ============================================================================
+// NOTE: Container Apps are NOT managed by Bicep
+// They are fully managed by separate CI/CD pipelines that handle:
+//   - Docker build & push to ACR
+//   - Container App create/update
+//   - Environment variables from Azure DevOps library
+//   - Health probes, scaling rules, CPU, memory
+// The containerApps object is only used for Application Gateway routing config
+// ============================================================================
 
 // ============================================================================
 // Azure Container Registry
@@ -127,7 +143,7 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' 
     appLogsConfiguration: {
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
-        customerId: '41399b6d-90aa-4d83-800c-8b892a63dd19'
+        customerId: logAnalyticsCustomerId
       }
     }
     peerAuthentication: {
@@ -177,6 +193,7 @@ resource privateEndpoints 'Microsoft.Network/privateEndpoints@2024-07-01' = {
     }
   }
 }
+
 resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
   name: containerAppEnvNetworkInterfaceName
   location: location
@@ -184,7 +201,7 @@ resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
   properties: {
     ipConfigurations: [
       {
-        name: 'privateEndpointIpConfig.43eaa636-8124-49c4-9b0c-4e7024357e32'
+        name: containerAppEnvNetworkInterfaceIpName
         properties: {
           privateIPAddress: '10.0.3.13'
           privateIPAllocationMethod: 'Dynamic'
@@ -211,7 +228,7 @@ resource networkInterfaces 'Microsoft.Network/networkInterfaces@2024-07-01' = {
 // Managed Identity
 // ============================================================================
 resource userAssignedIdentities 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
-  name: 'MI-APIM-ai-cognitive-NP'
+  name: userAssignedIdentityName
   location: 'eastus'
   tags: union(tags, {
     AtlasPurpose: 'Atlas-MSI-Generic'
@@ -224,94 +241,18 @@ resource userAssignedIdentities 'Microsoft.ManagedIdentity/userAssignedIdentitie
 }
 
 // ============================================================================
-// Container Apps
-// Create a container app for each entry in containerApps object
+// Container Apps - SKIPPED (Managed by CI/CD Pipelines)
+// Container Apps are NOT deployed by Bicep.
+// They are created and managed by separate CI/CD pipelines.
+// The containerApps parameter object is retained for:
+//   - Application Gateway backend pool configuration
+//   - Routing rules and path patterns
 // ============================================================================
 
-resource containerApp 'Microsoft.App/containerApps@2024-03-01' = [
-  for (app, i) in items(containerApps): {
-    name: app.value.name
-    location: location
-    tags: tags
-    identity: {
-      type: 'SystemAssigned'
-    }
-    properties: {
-      managedEnvironmentId: containerAppEnvironment.id
-      environmentId: containerAppEnvironment.id
-      configuration: {
-        secrets: []
-        activeRevisionsMode: app.value.?revision_mode ?? 'Single'
-        ingress: {
-          external: true
-          targetPort: app.value.?target_port ?? 80
-          exposedPort: 0
-          transport: 'auto'
-          traffic: [
-            {
-              weight: 100
-              latestRevision: true
-            }
-          ]
-          allowInsecure: false
-        }
-        registries: deployAcr
-          ? [
-              {
-                server: '${acrName}.azurecr.io'
-                identity: 'system-environment'
-              }
-            ]
-          : []
-        maxInactiveRevisions: app.value.?max_inactive_revisions ?? 100
-      }
-      template: {
-        containers: [
-          {
-            // Image managed by CI/CD - use placeholder for initial deployment
-            image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-            name: app.value.name
-            resources: {
-              cpu: contains(app.value, 'cpu') ? json(app.value.cpu) : json('0.25')
-              memory: app.value.?memory ?? '0.5Gi'
-            }
-            probes: contains(app.value, 'liveness_probe_path')
-              ? [
-                  {
-                    type: 'Liveness'
-                    httpGet: {
-                      path: app.value.liveness_probe_path
-                      port: app.value.?liveness_probe_port ?? app.value.target_port
-                    }
-                    initialDelaySeconds: 10
-                    periodSeconds: 30
-                    failureThreshold: 3
-                  }
-                ]
-              : []
-            env: []
-          }
-        ]
-        scale: {
-          minReplicas: app.value.?min_replicas ?? 0
-          maxReplicas: app.value.?max_replicas ?? 10
-          rules: [
-            {
-              http: {
-                metadata: {
-                  concurrentRequests: '100'
-                }
-              }
-              name: 'http'
-            }
-          ]
-          
-        }
-      }
-      workloadProfileName: 'Consumption'
-    }
-  }
-]
+// ============================================================================
+// Container App Jobs - NOT MANAGED BY BICEP
+// Jobs (like index-migration) are managed by CI/CD pipelines
+// ============================================================================
 
 // ============================================================================
 // Outputs
@@ -327,11 +268,5 @@ output containerAppEnvName string = containerAppEnvironment.name
 output containerAppEnvDefaultDomain string = containerAppEnvironment.properties.defaultDomain
 output containerAppEnvStaticIp string = containerAppEnvironment.properties.staticIp
 
-output containerAppIds array = [for (app, i) in items(containerApps): containerApp[i].id]
-output containerAppNames array = [for (app, i) in items(containerApps): containerApp[i].name]
-output containerAppFqdns array = [
-  for (app, i) in items(containerApps): containerApp[i].properties.configuration.ingress != null
-    ? containerApp[i].properties.configuration.ingress.fqdn
-    : ''
-]
-output containerAppPrincipalIds array = [for (app, i) in items(containerApps): containerApp[i].identity.principalId]
+// Container App outputs - NOT AVAILABLE (apps managed by CI/CD)
+// Use Azure CLI or Azure Portal to get container app details
